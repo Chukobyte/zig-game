@@ -9,7 +9,6 @@
     },
     .paths = .{
         "src",
-        "zeika.tar.gz",
         "build.zig",
         "build.zig.zon",
     },
