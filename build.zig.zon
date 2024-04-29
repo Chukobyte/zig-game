@@ -3,8 +3,8 @@
     .version = "0.0.1",
     .dependencies = .{
         .zeika = .{
-            .url = "zeika.tar.gz",
-            .hash = "12204cabe470ccf506cd5adc98e53c918d62a57a7ef75d16d1c05bef874ef096f8ee",
+            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.1.tar.gz",
+            .hash = "122028a5a622292e9f3dda11f6d4e1208755547a98cc7ba894f1e6aad173c016105b",
         },
     },
     .paths = .{
