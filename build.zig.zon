@@ -1,0 +1,16 @@
+.{
+    .name = "game",
+    .version = "0.0.1",
+    .dependencies = .{
+        .zeika = .{
+            .url = "zeika.tar.gz",
+            .hash = "12204cabe470ccf506cd5adc98e53c918d62a57a7ef75d16d1c05bef874ef096f8ee",
+        },
+    },
+    .paths = .{
+        "src",
+        "zeika.tar.gz",
+        "build.zig",
+        "build.zig.zon",
+    },
+}
