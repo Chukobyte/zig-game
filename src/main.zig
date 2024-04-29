@@ -1,25 +1,19 @@
 const std = @import("std");
 
-const seika = @cImport({
-    @cInclude("seika/seika.h");
-    @cInclude("seika/input/input.h");
-});
+const zeika = @import("zeika");
 
 pub fn main() !void {
-    if (!seika.ska_init_all("Zig Game", 800, 600, 800, 600)) {
-        std.debug.print("Failed to init seika!", .{});
-        return error.SeikaFailedToInit;
-    }
+    try zeika.init_all("Zig Game", 800, 600, 800, 600);
 
-    while (seika.ska_is_running()) {
-        seika.ska_update();
+    while (zeika.is_running()) {
+        zeika.update();
 
-        if (seika.ska_input_is_key_just_pressed(seika.SkaInputKey_KEYBOARD_ESCAPE, 0)) {
+        if (zeika.is_key_just_pressed(zeika.InputKey.KeyboardEscape, 0)) {
             break;
         }
 
-        seika.ska_window_render();
+        zeika.window_render();
     }
 
-    seika.ska_shutdown_all();
+    zeika.shutdown_all();
 }
