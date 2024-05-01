@@ -16,7 +16,10 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.linkLibC();
-    exe.linkLibrary(zeika_dep.artifact("seika"));
+    const seika_lib: *std.Build.Step.Compile = zeika_dep.artifact("seika");
+    exe.linkLibrary(seika_lib);
+    exe.installLibraryHeaders(seika_lib);
+    exe.root_module.addImport("zeika", zeika_dep.module("zeika"));
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
