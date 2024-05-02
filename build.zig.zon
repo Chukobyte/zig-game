@@ -1,15 +1,15 @@
 .{
     .name = "game",
     .version = "0.0.1",
-    .dependencies = .{
-        .zeika = .{
-            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.2.tar.gz",
-            .hash = "12202751571dfc2382ba3ea543d44447105646850ab760bcd513c507bc586c0c585a",
-        },
-    },
     .paths = .{
         "src",
         "build.zig",
         "build.zig.zon",
+    },
+    .dependencies = .{
+        .zeika = .{
+            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.3.tar.gz",
+            .hash = "12205741b6ff4b4a598ef59c8c231185fdf852c8b25709c543efc42a1073963a7149",
+        },
     },
 }
