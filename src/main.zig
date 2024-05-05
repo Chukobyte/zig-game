@@ -26,14 +26,6 @@ pub fn main() !void {
         .color = math.Color.Red,
     };
 
-    // Quick test
-    var data_db_inst = data_db.ObjectDataDB.init(std.heap.page_allocator);
-    defer data_db_inst.deinit();
-    const temp_object = try data_db_inst.createObject("Test");
-    try data_db_inst.writeProperty(temp_object, "age", i32, 8);
-    // const obj_age = data_db_inst.readProperty(temp_object, "age", i32);
-    // std.debug.print("obj_age = {}", .{ obj_age });
-    
     while (zeika.isRunning()) {
         zeika.update();
 

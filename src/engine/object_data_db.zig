@@ -35,10 +35,16 @@ const Property = struct {
 };
 
 const Object = struct {
+    //{
+    //  "name": "object_name",
+    //  "properties": [],
+    //  "subobjects": []
+    //{
+
     id: u32,
     name: []const u8,
     properties: std.ArrayList(Property),
-    sub_objects: std.ArrayList(Object),
+    sub_objects: std.ArrayList(*Object),
 };
 
 pub const ObjectDataDB = struct {
@@ -90,44 +96,45 @@ pub const ObjectDataDB = struct {
         new_object.id = self.object_ids_index;
         new_object.name = name;
         new_object.properties = std.ArrayList(Property).init(self.allocator);
-        new_object.sub_objects = std.ArrayList(Object).init(self.allocator);
+        new_object.sub_objects = std.ArrayList(*Object).init(self.allocator);
         self.object_ids_index += 1;
         return new_object;
     }
 
+    pub fn addAsSubObject(self: *@This(), object: *Object, sub_object: *Object) !void {
+        _ = self;
+        try object.sub_objects.append(sub_object);
+    }
+
     pub fn writeProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type, value: T) !void {
         _ = self;
-        if (!isValidPropertyType(T)) {
-            @compileError("value is not a value property type!");
-        }
+        if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
 
         const currentProperty: *Property = try findOrAddProperty(T, object, name);
         switch (comptime @typeInfo(T)) {
             .Bool => currentProperty.value = PropertyValue{ .boolean = value },
             .Int => currentProperty.value = PropertyValue{ .integer = value },
             .Float => currentProperty.value = PropertyValue{ .float = value },
-            .Array => {}, // TODO: Handle strings
+            .Array => currentProperty.value = PropertyValue{ .string = value },
             else => {},
         }
     }
 
-    // pub fn readProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type) !T {
-    //     _ = self;
-    //     if (!isValidPropertyType(T)) {
-    //         @compileError("value is not a value property type!");
-    //     }
-    //
-    //     if (findProperty(object, name)) |property| {
-    //         const propertyType: PropertyType = PropertyType.getTypeFromRealType(T);
-    //         switch (propertyType) {
-    //         .boolean => return property.value.boolean,
-    //         .integer => return property.value.integer,
-    //         .float => return property.value.float,
-    //         .string => return property.value.string,
-    //         }
-    //     }
-    //     return null;
-    // }
+    pub fn readProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type) ?T {
+        _ = self;
+        if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
+
+        if (findProperty(object, name)) |property| {
+            switch (comptime @typeInfo(T)) {
+                .Bool => return property.value.boolean,
+                .Int => return property.value.integer,
+                .Float => return property.value.float,
+                .Array => return property.value.string,
+                else => {},
+            }
+        }
+        return null;
+    }
 
     fn findProperty(object: *Object, name: []const u8) ?*Property {
         for (object.properties.items) |*property| {
@@ -139,6 +146,8 @@ pub const ObjectDataDB = struct {
     }
 
     fn findOrAddProperty(comptime T: type, object: *Object, name: []const u8) !*Property {
+        if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
+
         var property: ?*Property = findProperty(object, name);
         if (property == null) {
             property = try object.properties.addOne();
@@ -150,5 +159,33 @@ pub const ObjectDataDB = struct {
 
     inline fn isValidPropertyType(comptime T: type) bool {
         return T == i32 or T == bool or T == f32 or T == []const u8;
+    }
+};
+
+pub const ObjectsList = struct {
+    fn jsonStringifyObject(object: *const Object) !void {
+        _ = object;
+    }
+
+    pub fn jsonStringify(self: *const @This(), out: anytype) !void {
+        const json_fmt =
+        \\{
+        \\    "objects": [
+        \\        {
+        \\            "name": "{s}",
+        \\            "id": {d},
+        \\            "subobjects": []
+        \\        }
+        \\    ]
+        \\}}
+;
+        return out.print(json_fmt, .{ self.name, self.id });
+    }
+
+    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !@This() {
+        _ = alloc;
+        _ = source;
+        _ = options;
+        return @This(){};
     }
 };
