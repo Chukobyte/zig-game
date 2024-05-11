@@ -80,7 +80,7 @@ test "object data db json test" {
     try std.testing.expectEqual(0, subobject.subobjects.items.len);
 
     // Test stringify
-    const json_string = try std.json.stringifyAlloc(allocator, object_list, .{.whitespace = .indent_2});
+    const json_string = try std.json.stringifyAlloc(allocator, object_list, .{ .whitespace = .indent_2 });
     defer allocator.free(json_string);
     try std.testing.expectEqualStrings(json_to_parse,json_string);
     std.debug.print("json_string = \n{s}\n", .{ json_string });

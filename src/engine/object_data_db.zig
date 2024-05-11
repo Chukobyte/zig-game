@@ -112,7 +112,7 @@ pub const ObjectDataDB = struct {
     }
 
     pub fn writeProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type, value: T) !void {
-        if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
+        if (!isValidPropertyType(T)) { @compileError("value is not a valid property type!"); }
 
         const currentProperty: *Property = try findOrAddProperty(self, T, object, name);
         switch (comptime @typeInfo(T)) {
@@ -223,10 +223,10 @@ pub const ObjectsList = struct {
             try out.write(property.key);
             try out.objectField("value");
             switch (property.type) {
-            .boolean => try out.write(property.value.boolean),
-            .integer => try out.write(property.value.integer),
-            .float => try out.write(property.value.float),
-            .string => try out.write(property.value.string),
+                .boolean => try out.write(property.value.boolean),
+                .integer => try out.write(property.value.integer),
+                .float => try out.write(property.value.float),
+                .string => try out.write(property.value.string),
             }
             try out.endObject();
         }
@@ -265,17 +265,14 @@ pub const ObjectsList = struct {
         const objects_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
         if (!(objects_key_token == .string or objects_key_token == .allocated_string)) { std.debug.print("objects_key_token {any}\n", .{ objects_key_token }); unreachable; }
         switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-            .array_begin => { std.debug.print("expected objects array begin\n", .{}); },
+            .array_begin => {},
             else => unreachable,
         }
         while (true) {
             // Object begin
             switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
                 .object_begin => { std.debug.print("expected object begin\n", .{}); },
-                .array_end => {
-                    std.debug.print("no objects in array, skipping\n", .{});
-                    return object_buffer.allocateSlice(alloc);
-                },
+                .array_end => return object_buffer.allocateSlice(alloc), // Empty object array
                 else => unreachable,
             }
             // Parse Name
@@ -305,25 +302,25 @@ pub const ObjectsList = struct {
             {
                 // First parse properties key token
                 switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                    .string, .allocated_string => { std.debug.print("expected property key\n", .{}); },
+                    .string, .allocated_string => {},
                     else => unreachable,
                 }
                 // Now parse array
                 switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                    .array_begin => { std.debug.print("expected property array begin\n", .{}); },
+                    .array_begin => {},
                     else => unreachable,
                 }
                 // Now parse properties
                 parse_objects: while (true) {
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .object_begin => { std.debug.print("expected property object begin\n", .{}); },
-                        .array_end => { std.debug.print("expected property array end, breaking...\n", .{}); break :parse_objects; },
+                        .object_begin => {},
+                        .array_end => break :parse_objects, // Stop parsing properties since we reached end of array
                         else => unreachable,
                     }
                     var property: Property = Property{ .key = undefined, .type = undefined, .value = undefined };
                     // Parse key key
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .string, .allocated_string => { std.debug.print("expected key string\n", .{}); },
+                        .string, .allocated_string => {},
                         else => unreachable,
                     }
                     // Parse key value
@@ -333,7 +330,7 @@ pub const ObjectsList = struct {
                     }
                     // Parse value key
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .string, .allocated_string => { std.debug.print("expected value string\n", .{}); },
+                        .string, .allocated_string => {},
                         else => unreachable,
                     }
                     // Parse value value
@@ -391,17 +388,9 @@ pub const ObjectsList = struct {
 
             // Object End
             switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                .object_end => {
-                    std.debug.print("expected object end\n", .{});
-                },
-                .array_end => {
-                    std.debug.print("expected array end only for top most object list\n", .{});
-                    break;
-                },
-                else => |v| {
-                    std.debug.print("v = {any}", .{ v });
-                    unreachable;
-                },
+                .object_end => {},
+                .array_end => break,
+                else => unreachable,
             }
         }
         return object_buffer.allocateSlice(alloc);
