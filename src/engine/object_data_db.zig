@@ -2,6 +2,10 @@
 
 const std = @import("std");
 
+const ObjectError = error{
+    FailedToFindProperty,
+};
+
 pub const PropertyType = enum {
     boolean,
     integer,
@@ -126,7 +130,7 @@ pub const ObjectDataDB = struct {
         currentProperty.has_ever_been_written_to = true;
     }
 
-    pub fn readProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type) ?T {
+    pub fn readProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type) ObjectError!T {
         if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
 
         if (findProperty(self, object, name)) |property| {
@@ -138,7 +142,7 @@ pub const ObjectDataDB = struct {
                 else => {},
             }
         }
-        return null;
+        return ObjectError.FailedToFindProperty;
     }
 
     fn findProperty(self: *@This(), object: *Object, key: []const u8) ?*Property {
@@ -309,7 +313,7 @@ pub const ObjectsList = struct {
                     .array_begin => { std.debug.print("expected property array begin\n", .{}); },
                     else => unreachable,
                 }
-                // Now parse property
+                // Now parse properties
                 parse_objects: while (true) {
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
                         .object_begin => { std.debug.print("expected property object begin\n", .{}); },
@@ -375,8 +379,6 @@ pub const ObjectsList = struct {
             var new_object = Object{ .name = object_name, .id = object_id, .properties = std.ArrayList(Property).init(alloc), .subobjects = std.ArrayList(*Object).init(alloc) };
             // Add properties
             for (properties_slice) |prop| {
-                // const copied_prop = try alloc.create(Property);
-                // copied_prop.* = prop;
                 try new_object.properties.append(prop);
             }
             // Add subobjects

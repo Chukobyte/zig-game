@@ -10,18 +10,12 @@ test "object data db read and write test" {
     defer data_db_inst.deinit();
     const temp_object = try data_db_inst.createObject("Test");
     try data_db_inst.writeProperty(temp_object, "age", i32, 8);
-    if (data_db_inst.readProperty(temp_object, "age", i32)) |old_age| {
-        try std.testing.expectEqual(8, old_age);
-    } else {
-        try std.testing.expect(false);
-    }
+    const old_age = try data_db_inst.readProperty(temp_object, "age", i32);
+    try std.testing.expectEqual(8, old_age);
 
     try data_db_inst.writeProperty(temp_object, "name", []const u8, "Daniel");
-    if (data_db_inst.readProperty(temp_object, "name", []const u8)) |name| {
-        try std.testing.expectEqualStrings("Daniel", name);
-    } else {
-        try std.testing.expect(false);
-    }
+    const name = try data_db_inst.readProperty(temp_object, "name", []const u8);
+    try std.testing.expectEqualStrings("Daniel", name);
 
     const temp_object2 = try data_db_inst.createObject("Test2");
     try data_db_inst.addAsSubObject(temp_object, temp_object2);
