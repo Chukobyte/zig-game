@@ -14,17 +14,23 @@ const Color = math.Color;
 const Texture = zeika.Texture;
 const Renderer = zeika.Renderer;
 
-const GameObject = game.GameObject;
+const Entity = game.Entity;
 const Sprite = game.Sprite;
+const Font = game.Font;
+const TextLabel = game.TextLabel;
 
 pub fn main() !void {
     try zeika.initAll("Zig Test", 800, 600, 800, 600);
 
+    const allocator = std.heap.page_allocator;
+
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
 
-    var game_objects = [_]GameObject{
-        GameObject{
+    const default_font: Font = Font.initDefaultFont(.{ .font_size = 16, .apply_nearest_neighbor = true });
+
+    var entities = [_]Entity{
+        Entity{
             .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 100.0 } },
             .sprite = Sprite{
                 .texture = texture_handle,
@@ -33,18 +39,17 @@ pub fn main() !void {
                 .modulate = Color.Red,
             },
             .update_func = struct {
-                pub fn update(self: *GameObject) void {
+                pub fn update(self: *Entity) void {
                     self.transform.position.x += 0.5;
                 }
             }.update,
         },
-        GameObject{
+        Entity{
             .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 200.0 } },
-            .sprite = Sprite{
-                .texture = texture_handle,
-                .size = Vec2{ .x = 64.0, .y = 64.0 },
-                .draw_source = Rect2{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                .modulate = Color.Blue,
+            .text_label = TextLabel{
+                .font = default_font,
+                .text = try allocator.dupe(u8, "Yeah!"), // TODO: Handle string dynamically
+                .modulate = Color.Blue
             },
         },
     };
@@ -59,15 +64,15 @@ pub fn main() !void {
         // TODO: Prototyping things, eventually will categorize game objects so we don't have conditionals within the update loops
 
         // Object Updates
-        for (&game_objects) |*object| {
-            if (object.update_func) |update| {
-                update(object);
+        for (&entities) |*entity| {
+            if (entity.update_func) |update| {
+                update(entity);
             }
         }
 
         // Render
-        for (&game_objects) |*object| {
-            if (object.getSpriteDrawConfig()) |draw_config| {
+        for (&entities) |*entity| {
+            if (entity.getSpriteDrawConfig()) |draw_config| {
                 Renderer.queueDrawSprite(&draw_config);
             }
         }

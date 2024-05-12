@@ -15,11 +15,16 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const assets_module = b.addModule("assets", .{
+        .root_source_file = .{ .path = "assets/embed_assets.zig" },
+    });
+
     exe.linkLibC();
     const seika_lib: *std.Build.Step.Compile = zeika_dep.artifact("seika");
     exe.linkLibrary(seika_lib);
     exe.installLibraryHeaders(seika_lib);
     exe.root_module.addImport("zeika", zeika_dep.module("zeika"));
+    exe.root_module.addImport("assets", assets_module);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
