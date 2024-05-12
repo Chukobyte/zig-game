@@ -2,6 +2,10 @@
 
 const std = @import("std");
 
+inline fn isValidPropertyType(comptime T: type) bool {
+    return T == i32 or T == bool or T == f32 or T == []const u8;
+}
+
 const ObjectError = error{
     FailedToFindProperty,
 };
@@ -166,10 +170,6 @@ pub const ObjectDataDB = struct {
         }
         return property.?;
     }
-
-    inline fn isValidPropertyType(comptime T: type) bool {
-        return T == i32 or T == bool or T == f32 or T == []const u8;
-    }
 };
 
 pub const ObjectsList = struct {
@@ -243,6 +243,58 @@ pub const ObjectsList = struct {
         try out.endObject();
     }
 
+    fn jsonNextAlloc(comptime T: type, alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !T {
+        if (!isValidPropertyType(T) and T != []u8 and T != u32) { @compileError("value is not a value property type!"); }
+
+        const token: std.json.Token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
+        switch (@typeInfo(T)) {
+            .Bool => {
+                switch (token) {
+                    .true => return true,
+                    .false => return false,
+                    else => unreachable,
+                }
+            },
+            .Int => {
+                switch (token) {
+                    .number, .partial_number, .allocated_number => |v| {
+                        const parsedInt = try std.fmt.parseInt(T, v, 10);
+                        if (token == .allocated_number) {
+                            alloc.free(token.allocated_number);
+                        }
+                        return parsedInt;
+                    },
+                    else => unreachable,
+                }
+            },
+            .Float => {
+                switch (token) {
+                .number, .partial_number, .allocated_number => |v| {
+                    const parsedFloat = try std.fmt.parseFloat(T, v, 10);
+                    if (token == .allocated_number) {
+                        alloc.free(token.allocated_number);
+                    }
+                    return parsedFloat;
+                },
+                else => unreachable,
+                }
+            },
+            .Pointer => {
+                switch (token) {
+                    .string, .allocated_string => |v| {
+                        const parsedString = try alloc.dupe(u8, v);
+                        if (token == .allocated_string) {
+                            alloc.free(token.allocated_string);
+                        }
+                        return parsedString;
+                    },
+                    else => unreachable,
+                }
+            },
+            else => unreachable,
+        }
+    }
+
     // Recursive
     fn jsonParseNextObjectsArray(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) ![]Object {
         const ObjectBuffer = struct {
@@ -286,14 +338,10 @@ pub const ObjectsList = struct {
             }
             std.debug.print("Object name = {s}\n", .{ object_name });
             // Parse Id
-            var object_id: u32 = undefined;
-            const id_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-            if (!(id_key_token == .string or name_key_token == .allocated_string)) { unreachable; }
-            const id_value_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-            switch (id_value_token) {
-                .number, .partial_number, .allocated_number => |v| { object_id = try std.fmt.parseInt(u32, v, 10); },
-                else => unreachable,
-            }
+            const id_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+            std.debug.assert(std.mem.eql(u8, "id", id_key));
+            defer alloc.free(id_key);
+            const object_id: u32 = try jsonNextAlloc(u32, alloc, source, options);
             std.debug.print("Object id = {d}\n", .{ object_id });
 
             // Parse properties
@@ -301,10 +349,9 @@ pub const ObjectsList = struct {
             var properties_count: usize = 0;
             {
                 // First parse properties key token
-                switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                    .string, .allocated_string => {},
-                    else => unreachable,
-                }
+                const prop_array_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                std.debug.assert(std.mem.eql(u8, "properties", prop_array_key));
+                defer alloc.free(prop_array_key);
                 // Now parse array
                 switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
                     .array_begin => {},
@@ -319,20 +366,15 @@ pub const ObjectsList = struct {
                     }
                     var property: Property = Property{ .key = undefined, .type = undefined, .value = undefined };
                     // Parse key key
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .string, .allocated_string => {},
-                        else => unreachable,
-                    }
+                    const prop_key_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                    std.debug.assert(std.mem.eql(u8, "key", prop_key_key));
+                    defer alloc.free(prop_key_key);
                     // Parse key value
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .string, .allocated_string => |v| { property.key = try alloc.dupe(u8, v); },
-                        else => unreachable,
-                    }
+                    property.key = try jsonNextAlloc([]u8, alloc, source, options);
                     // Parse value key
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .string, .allocated_string => {},
-                        else => unreachable,
-                    }
+                    const prop_key_value: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                    std.debug.assert(std.mem.eql(u8, "value", prop_key_value));
+                    defer alloc.free(prop_key_value);
                     // Parse value value
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
                         .true => {
