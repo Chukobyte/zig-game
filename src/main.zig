@@ -76,7 +76,7 @@ pub fn main() !void {
                 Renderer.queueDrawSprite(&draw_config);
             }
         }
-        Renderer.flushBatchedSprites();
+        Renderer.flushBatches();
     }
 
     zeika.shutdownAll();
