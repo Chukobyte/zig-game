@@ -269,14 +269,14 @@ pub const ObjectsList = struct {
             },
             .Float => {
                 switch (token) {
-                .number, .partial_number, .allocated_number => |v| {
-                    const parsedFloat = try std.fmt.parseFloat(T, v, 10);
-                    if (token == .allocated_number) {
-                        alloc.free(token.allocated_number);
-                    }
-                    return parsedFloat;
-                },
-                else => unreachable,
+                    .number, .partial_number, .allocated_number => |v| {
+                        const parsedFloat = try std.fmt.parseFloat(T, v, 10);
+                        if (token == .allocated_number) {
+                            alloc.free(token.allocated_number);
+                        }
+                        return parsedFloat;
+                    },
+                    else => unreachable,
                 }
             },
             .Pointer => {

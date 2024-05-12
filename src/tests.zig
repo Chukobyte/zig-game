@@ -1,9 +1,12 @@
 const std = @import("std");
 
 const data_db = @import("engine/object_data_db.zig");
+const game = @import("game/game.zig");
+
 const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
+
 
 test "object data db read and write test" {
     var data_db_inst = data_db.ObjectDataDB.init(std.heap.page_allocator);
