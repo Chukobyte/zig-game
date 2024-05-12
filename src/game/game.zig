@@ -35,6 +35,7 @@ pub const GameObject = struct {
     z_index: i32 = 0,
     sprite: ?Sprite = null,
     text_label: ?TextLabel = null,
+    update_func: ?*const fn(self: *@This()) void = null,
 
     pub fn getSpriteDrawConfig(self: *const @This()) ?Renderer.SpriteDrawQueueConfig {
         if (self.sprite) |sprite| {
