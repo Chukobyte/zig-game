@@ -11,26 +11,7 @@ const Color = math.Color;
 
 const Renderer = zeika.Renderer;
 const Texture = zeika.Texture;
-
-pub const Font = struct {
-    font: [*c]seika.SkaFont,
-
-    pub const InitParams = struct {
-        font_size: i32 = 16,
-        apply_nearest_neighbor: bool = true,
-    };
-
-    pub fn initDefaultFont(init_params: InitParams) @This() {
-        const DefaultFont = assets.DefaultFont;
-        var default_font: Font = Font{ .font = undefined };
-        default_font.font = seika.ska_font_create_font_from_memory(DefaultFont.data, DefaultFont.len, init_params.font_size, init_params.apply_nearest_neighbor);
-        return default_font;
-    }
-
-    pub fn deinit(self: *@This()) void {
-        _ = self;
-    }
-};
+const Font = zeika.Font;
 
 pub const Sprite = struct {
     texture: Texture.Handle,
@@ -45,7 +26,7 @@ pub const Sprite = struct {
 pub const TextLabel = struct {
     font: Font,
     text: []u8,
-    modulate: Color = Color.White,
+    color: Color = Color.White,
 };
 
 pub const Entity = struct {
@@ -66,6 +47,22 @@ pub const Entity = struct {
                 .size = sprite.size,
                 .transform = &self.transform,
                 .color = sprite.modulate,
+                .flip_h = sprite.flip_h,
+                .flip_v = sprite.flip_v,
+                .z_index = self.z_index,
+            };
+        }
+        return null;
+    }
+
+    pub fn getTextDrawConfig(self: *const @This()) ?Renderer.TextDrawQueueConfig {
+        if (self.text_label) |text_label| {
+            return Renderer.TextDrawQueueConfig{
+                .font = text_label.font,
+                .text = text_label.text,
+                .position = self.transform.position,
+                .color = text_label.color,
+                .z_index = self.z_index,
             };
         }
         return null;

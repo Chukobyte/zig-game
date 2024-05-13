@@ -3,7 +3,7 @@
 const default_font_file = @embedFile("font/verdana.ttf");
 
 const EmbeddedAssets = struct {
-    data: ?*anyopaque,
+    data: *anyopaque,
     len: usize,
 };
 

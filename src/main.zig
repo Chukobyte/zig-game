@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const zeika = @import("zeika");
+const assets = @import("assets");
 
 const data_db = @import("engine/object_data_db.zig");
 const game = @import("game/game.zig");
@@ -12,11 +13,11 @@ const Transform2D = math.Transform2D;
 const Color = math.Color;
 
 const Texture = zeika.Texture;
+const Font = zeika.Font;
 const Renderer = zeika.Renderer;
 
 const Entity = game.Entity;
 const Sprite = game.Sprite;
-const Font = game.Font;
 const TextLabel = game.TextLabel;
 
 pub fn main() !void {
@@ -27,7 +28,11 @@ pub fn main() !void {
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
 
-    const default_font: Font = Font.initDefaultFont(.{ .font_size = 16, .apply_nearest_neighbor = true });
+    const default_font: Font = Font.initFromMemory(
+        assets.DefaultFont.data,
+        assets.DefaultFont.len,
+        .{ .font_size = 16, .apply_nearest_neighbor = true }
+    );
 
     var entities = [_]Entity{
         Entity{
@@ -36,7 +41,7 @@ pub fn main() !void {
                 .texture = texture_handle,
                 .size = Vec2{ .x = 64.0, .y = 64.0 },
                 .draw_source = Rect2{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                .modulate = Color.Red,
+                .modulate = Color.Blue,
             },
             .update_func = struct {
                 pub fn update(self: *Entity) void {
@@ -49,7 +54,7 @@ pub fn main() !void {
             .text_label = TextLabel{
                 .font = default_font,
                 .text = try allocator.dupe(u8, "Yeah!"), // TODO: Handle string dynamically
-                .modulate = Color.Blue
+                .color = Color.Red
             },
         },
     };
@@ -74,6 +79,9 @@ pub fn main() !void {
         for (&entities) |*entity| {
             if (entity.getSpriteDrawConfig()) |draw_config| {
                 Renderer.queueDrawSprite(&draw_config);
+            }
+            if (entity.getTextDrawConfig()) |draw_config| {
+                Renderer.queueDrawText(&draw_config);
             }
         }
         Renderer.flushBatches();
