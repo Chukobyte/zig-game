@@ -23,8 +23,6 @@ const TextLabel = game.TextLabel;
 pub fn main() !void {
     try zeika.initAll("Zig Test", 800, 600, 800, 600);
 
-    const allocator = std.heap.page_allocator;
-
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
 
@@ -53,9 +51,21 @@ pub fn main() !void {
             .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 200.0 } },
             .text_label = TextLabel{
                 .font = default_font,
-                .text = try allocator.dupe(u8, "Yeah!"), // TODO: Handle string dynamically
+                .text = undefined,
                 .color = Color.Red
             },
+            .update_func = struct {
+                pub fn update(self: *Entity) void {
+                    const StaticData = struct {
+                        var text_buffer: [256]u8 = undefined;
+                        var money: i32 = 0;
+                    };
+                    if (self.text_label) |*text_label| {
+                        text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+                    }
+                    StaticData.money += 1;
+                }
+            }.update,
         },
     };
 
