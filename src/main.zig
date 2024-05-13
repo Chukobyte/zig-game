@@ -31,6 +31,7 @@ pub fn main() !void {
         assets.DefaultFont.len,
         .{ .font_size = 16, .apply_nearest_neighbor = true }
     );
+    defer default_font.deinit();
 
     var entities = [_]Entity{
         Entity{
@@ -51,7 +52,6 @@ pub fn main() !void {
             .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 200.0 } },
             .text_label = TextLabel{
                 .font = default_font,
-                .text = undefined,
                 .color = Color.Red
             },
             .update_func = struct {

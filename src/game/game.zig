@@ -25,7 +25,7 @@ pub const Sprite = struct {
 
 pub const TextLabel = struct {
     font: Font,
-    text: []u8,
+    text: []u8 = undefined,
     color: Color = Color.White,
 };
 
