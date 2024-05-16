@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const assets_module = b.addModule("assets", .{
-        .root_source_file = .{ .path = "assets/embed_assets.zig" },
+        .root_source_file = .{ .path = "embed_assets.zig" },
     });
 
     exe.linkLibC();

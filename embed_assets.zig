@@ -1,6 +1,6 @@
 ///! Zig file used to embed assets at compile time
 
-const default_font_file = @embedFile("font/verdana.ttf");
+const default_font_file = @embedFile("assets/font/verdana.ttf");
 
 const EmbeddedAssets = struct {
     data: *anyopaque,
