@@ -1,13 +1,17 @@
 ///! Zig file used to embed assets at compile time
 
-const default_font_file = @embedFile("assets/font/verdana.ttf");
+pub const DefaultFont = EmbeddedAsset.create("assets/font/verdana.ttf");
 
-const EmbeddedAssets = struct {
+const EmbeddedAsset = struct {
     data: *anyopaque,
     len: usize,
+
+    fn create(comptime file_path: []const u8) EmbeddedAsset {
+        const embedded_file = @embedFile(file_path);
+        return EmbeddedAsset{
+            .data = @ptrCast(@constCast(embedded_file.ptr)),
+            .len = embedded_file.len,
+        };
+    }
 };
 
-pub const DefaultFont = EmbeddedAssets{
-    .data = @ptrCast(@constCast(default_font_file.ptr)),
-    .len = default_font_file.len,
-};
