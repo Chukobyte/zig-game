@@ -30,4 +30,14 @@ pub fn build(b: *std.Build) void {
     const run_exe = b.addRunArtifact(exe);
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_exe.step);
+
+    // Test
+    const test_exe = b.addTest(.{
+        .root_source_file = .{ .path = "src/tests.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_test = b.addRunArtifact(test_exe);
+    const test_step = b.step("test", "Run tests for the game");
+    test_step.dependOn(&run_test.step);
 }

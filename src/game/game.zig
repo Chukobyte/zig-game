@@ -29,11 +29,20 @@ pub const TextLabel = struct {
     color: Color = Color.White,
 };
 
+pub const Collision = struct {
+    collider: Rect2,
+
+    pub inline fn isColliding(self: *const @This(), other: *const @This()) bool {
+        return self.collider.doesOverlap(other.collider);
+    }
+};
+
 pub const Entity = struct {
     transform: Transform2D = Transform2D.Identity,
     z_index: i32 = 0,
     sprite: ?Sprite = null,
     text_label: ?TextLabel = null,
+    collision: ?Collision = null,
 
     on_enter_scene_func: ?*const fn(self: *@This()) void = null,
     on_exit_scene_func: ?*const fn(self: *@This()) void = null,
@@ -67,4 +76,31 @@ pub const Entity = struct {
         }
         return null;
     }
+};
+
+pub const Hero = struct {
+    pub const Stats = struct {
+        health: i32,
+        tiles: i32,
+        attack: i32,
+        defense: i32,
+        accuracy: i32,
+        evasion: i32,
+    };
+
+    pub const PowerEffect = struct {
+        pub const Type = enum {
+            active,
+            passive,
+        };
+
+        type: Type,
+    };
+
+    pub const Power = struct {
+
+    };
+
+    stats: Stats,
+    powers: []Power,
 };

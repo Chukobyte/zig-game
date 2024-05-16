@@ -21,7 +21,7 @@ const Sprite = game.Sprite;
 const TextLabel = game.TextLabel;
 
 pub fn main() !void {
-    try zeika.initAll("Zig Test", 800, 600, 800, 600);
+    try zeika.initAll("Zig Test", 800, 450, 800, 450);
 
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
@@ -72,7 +72,7 @@ pub fn main() !void {
     while (zeika.isRunning()) {
         zeika.update();
 
-        if (zeika.isKeyJustPressed(zeika.InputKey.keyboard_escape, 0)) {
+        if (zeika.isKeyJustPressed(.keyboard_escape, 0)) {
             break;
         }
 
