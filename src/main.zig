@@ -19,6 +19,7 @@ const Renderer = zeika.Renderer;
 const Entity = game.Entity;
 const Sprite = game.Sprite;
 const TextLabel = game.TextLabel;
+const Collision = game.Collision;
 
 pub fn main() !void {
     try zeika.initAll("Zig Test", 800, 450, 800, 450);
@@ -42,9 +43,28 @@ pub fn main() !void {
                 .draw_source = Rect2{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
                 .modulate = Color.Blue,
             },
+            .collision = Collision{ .collider = Rect2{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
             .update_func = struct {
                 pub fn update(self: *Entity) void {
                     self.transform.position.x += 0.5;
+
+                    if (self.sprite) |*sprite| {
+                        if (self.collision) |*collision| {
+                            const world_mouse_pos: Vec2 = game.getWorldMousePos();
+                            const entity_collider = Rect2{
+                                .x = self.transform.position.x + collision.collider.x,
+                                .y = self.transform.position.y + collision.collider.y,
+                                .w = collision.collider.w,
+                                .h = collision.collider.h
+                            };
+                            const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
+                            if (entity_collider.doesOverlap(&mouse_collider)) {
+                                sprite.modulate = Color.Red;
+                            } else {
+                                sprite.modulate = Color.Blue;
+                            }
+                        }
+                    }
                 }
             }.update,
         },

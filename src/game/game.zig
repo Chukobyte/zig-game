@@ -5,6 +5,7 @@ const seika = zeika.seika;
 const math = zeika.math;
 
 const Vec2 = math.Vec2;
+const Vec2i = math.Vec2i;
 const Transform2D = math.Transform2D;
 const Rect2 = math.Rect2;
 const Color = math.Color;
@@ -104,3 +105,29 @@ pub const Hero = struct {
     stats: Stats,
     powers: []Power,
 };
+
+fn mapToRange(comptime T: type, input: T, input_min: T, input_max: T, output_min: T, output_max: T) T {
+    return (((input - input_min) / (input_max - input_min)) * (output_max - output_min) + output_min);
+}
+
+const Camera = struct {
+    viewport: Vec2 = Vec2.Zero,
+    zoom: Vec2 = Vec2.One,
+    offset: Vec2 = Vec2.Zero,
+};
+
+pub fn getWorldMousePos( ) Vec2 {
+    const mouse_pos: Vec2 = zeika.getMousePosition();
+    const game_window_size = Vec2i{ .x = 800, .y = 450 };
+    const game_resolution = Vec2i{ .x = 800, .y = 450 };
+    const global_camera = Camera{};
+    const mouse_pixel_coord = Vec2{
+        .x = mapToRange(f32, mouse_pos.x, 0.0, game_window_size.x, 0.0, game_resolution.x),
+        .y = mapToRange(f32, mouse_pos.y, 0.0, game_window_size.y, 0.0, game_resolution.y)
+    };
+    const mouse_world_pos = Vec2{
+        .x = (global_camera.viewport.x + global_camera.offset.x + mouse_pixel_coord.x) * global_camera.zoom.x,
+        .y = (global_camera.viewport.y + global_camera.offset.y + mouse_pixel_coord.y) * global_camera.zoom.y
+    };
+    return mouse_world_pos;
+}
