@@ -59,7 +59,11 @@ pub fn main() !void {
                             };
                             const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
                             if (entity_collider.doesOverlap(&mouse_collider)) {
-                                sprite.modulate = Color.Red;
+                                if (zeika.isKeyPressed(.mouse_button_left, 0)) {
+                                    sprite.modulate = Color.White;
+                                } else {
+                                    sprite.modulate = Color.Red;
+                                }
                             } else {
                                 sprite.modulate = Color.Blue;
                             }
