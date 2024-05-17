@@ -16,6 +16,7 @@ const Texture = zeika.Texture;
 const Font = zeika.Font;
 const Renderer = zeika.Renderer;
 
+const World = game.World;
 const Entity = game.Entity;
 const Sprite = game.Sprite;
 const TextLabel = game.TextLabel;
@@ -92,6 +93,9 @@ pub fn main() !void {
             }.update,
         },
     };
+    var world = World.init(std.heap.page_allocator);
+    defer world.deinit();
+    try world.registerEntities(&entities);
 
     while (zeika.isRunning()) {
         zeika.update();
@@ -103,18 +107,18 @@ pub fn main() !void {
         // TODO: Prototyping things, eventually will categorize game objects so we don't have conditionals within the update loops
 
         // Object Updates
-        for (&entities) |*entity| {
-            if (entity.update_func) |update| {
+        for (world.entities.items) |entity| {
+            if (entity.*.update_func) |update| {
                 update(entity);
             }
         }
 
         // Render
-        for (&entities) |*entity| {
-            if (entity.getSpriteDrawConfig()) |draw_config| {
+        for (world.entities.items) |entity| {
+            if (entity.*.getSpriteDrawConfig()) |draw_config| {
                 Renderer.queueDrawSprite(&draw_config);
             }
-            if (entity.getTextDrawConfig()) |draw_config| {
+            if (entity.*.getTextDrawConfig()) |draw_config| {
                 Renderer.queueDrawText(&draw_config);
             }
         }

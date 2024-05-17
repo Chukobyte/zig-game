@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const zeika = @import("zeika");
 const assets = @import("assets");
 
@@ -76,6 +78,29 @@ pub const Entity = struct {
             };
         }
         return null;
+    }
+};
+
+pub const World = struct {
+    entities: std.ArrayList(*Entity),
+
+    pub fn init(allocator: std.mem.Allocator) @This() {
+        return @This(){
+            .entities = std.ArrayList(*Entity).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        self.entities.deinit();
+    }
+
+    pub fn registerEntities(self: *@This(), entities: [] Entity) !void {
+        for (entities) |*entity| {
+            try self.entities.append(entity);
+            if (entity.on_enter_scene_func) |enter_scene_func| {
+                enter_scene_func(entity);
+            }
+        }
     }
 };
 
