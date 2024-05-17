@@ -40,9 +40,48 @@ pub const Collision = struct {
     }
 };
 
+pub fn TagList(max_tags: comptime_int) type {
+    return struct {
+        tags: [max_tags][]const u8 = undefined,
+        tag_count: usize = 0,
+
+        pub fn initFromSlice(tags: []const []const u8) @This() {
+            var tag_list = @This(){};
+            for (tags) |tag| {
+                tag_list.addTag(tag) catch { std.debug.print("Skipping adding tag due to being at the limit '{d}'", .{ max_tags }); };
+            }
+            return tag_list;
+        }
+
+        pub fn addTag(self: *@This(), tag: []const u8) !void {
+            if (self.tag_count >= max_tags) {
+                return error.OutOfTagSpace;
+            }
+            self.tags[self.tag_count] = tag;
+            self.tag_count += 1;
+        }
+
+        pub fn getTags(self: *const @This()) [][]const u8 {
+            return self.tags[0..self.tag_count];
+        }
+
+        pub fn hasTag(self: *const @This(), tag: []const u8) bool {
+            for (self.tags) |current_tag| {
+                if (std.mem.eql(u8, tag, current_tag)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+}
+
 pub const Entity = struct {
+    pub const Tags = TagList(4);
+
     transform: Transform2D = Transform2D.Identity,
     z_index: i32 = 0,
+    tag_list: ?Tags = null,
     sprite: ?Sprite = null,
     text_label: ?TextLabel = null,
     collision: ?Collision = null,
@@ -82,11 +121,13 @@ pub const Entity = struct {
 };
 
 pub const World = struct {
-    entities: std.ArrayList(*Entity),
+    allocator: std.mem.Allocator,
+    entities: std.ArrayList(Entity),
 
     pub fn init(allocator: std.mem.Allocator) @This() {
         return @This(){
-            .entities = std.ArrayList(*Entity).init(allocator),
+            .allocator = allocator,
+            .entities = std.ArrayList(Entity).init(allocator),
         };
     }
 
@@ -94,13 +135,31 @@ pub const World = struct {
         self.entities.deinit();
     }
 
-    pub fn registerEntities(self: *@This(), entities: [] Entity) !void {
-        for (entities) |*entity| {
-            try self.entities.append(entity);
+    /// Will register entity to the world.  Will create an owned copy of the passed in entity.
+    pub fn registerEntity(self: *@This(), entity: Entity) !void {
+        try self.registerEntities([]Entity { entity });
+    }
+
+    /// Will register entities to the world.  Creates copies of the passed in entities and the world takes ownership.
+    pub fn registerEntities(self: *@This(), entities: []const Entity) !void {
+        try self.entities.appendSlice(entities);
+        for (self.entities.items) |*entity| {
             if (entity.on_enter_scene_func) |enter_scene_func| {
                 enter_scene_func(entity);
             }
         }
+    }
+
+    /// Returns first entity that matches a tag
+    pub fn getEntityByTag(self: *@This(), tag: []const u8) ?*Entity {
+        for (self.entities.items) |*entity| {
+            if (entity.tag_list) |tag_list| {
+                if (tag_list.hasTag(tag)) {
+                    return entity;
+                }
+            }
+        }
+        return null;
     }
 };
 
@@ -137,10 +196,149 @@ const Camera = struct {
     offset: Vec2 = Vec2.Zero,
 };
 
+// Game
+
+const GameProperties = struct {
+    title: []const u8 = "ZigTest",
+    initial_window_size: Vec2i = Vec2i{ .x = 800, .y = 450 },
+    resolution: Vec2i = Vec2i{ .x = 800, .y = 450 },
+};
+
+const game_properties = GameProperties{};
+var gloabal_world: World = undefined;
+
+pub fn init() !void {
+    try zeika.initAll(
+        game_properties.title,
+        game_properties.initial_window_size.x,
+        game_properties.initial_window_size.y,
+        game_properties.resolution.x,
+        game_properties.resolution.y
+    );
+    gloabal_world = World.init(std.heap.page_allocator);
+
+}
+
+pub fn deinit() void {
+    gloabal_world.deinit();
+    zeika.shutdownAll();
+}
+
+pub fn run() !void {
+    const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
+    defer Texture.deinit(texture_handle);
+
+    const default_font: Font = Font.initFromMemory(
+            assets.DefaultFont.data,
+            assets.DefaultFont.len,
+            .{ .font_size = 16, .apply_nearest_neighbor = true }
+    );
+    defer default_font.deinit();
+
+    const entities = [_]Entity{
+        Entity{
+            .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 100.0 } },
+            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "sprite" }),
+            .sprite = Sprite{
+                .texture = texture_handle,
+                .size = Vec2{ .x = 64.0, .y = 64.0 },
+                .draw_source = Rect2{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                .modulate = Color.Blue,
+            },
+            .collision = Collision{ .collider = Rect2{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
+            .update_func = struct {
+                pub fn update(self: *Entity) void {
+                    if (self.sprite) |*sprite| {
+                        if (self.collision) |*collision| {
+                            const world_mouse_pos: Vec2 = getWorldMousePos();
+                            const entity_collider = Rect2{
+                                .x = self.transform.position.x + collision.collider.x,
+                                .y = self.transform.position.y + collision.collider.y,
+                                .w = collision.collider.w,
+                                .h = collision.collider.h
+                            };
+                            const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
+                            if (entity_collider.doesOverlap(&mouse_collider)) {
+                                if (zeika.isKeyPressed(.mouse_button_left, 0)) {
+                                    sprite.modulate = Color.White;
+                                } else {
+                                    sprite.modulate = Color.Red;
+                                }
+
+                                if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
+                                    if (gloabal_world.getEntityByTag("text_label")) |text_label_entity| {
+                                        if (text_label_entity.text_label) |*text_label| {
+                                            const StaticData = struct {
+                                                var text_buffer: [256]u8 = undefined;
+                                                var money: i32 = 0;
+                                            };
+                                            StaticData.money += 1;
+                                            text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+                                        }
+                                    }
+                                }
+                            } else {
+                                sprite.modulate = Color.Blue;
+                            }
+                        }
+                    }
+                }
+                }.update,
+        },
+        Entity{
+            .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 200.0 } },
+            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "text_label" }),
+            .text_label = TextLabel{
+                .font = default_font,
+                .color = Color.Red
+            },
+            .on_enter_scene_func = struct {
+                pub fn on_enter_scene(self: *Entity) void  {
+                    const StaticData = struct {
+                        var text_buffer: [256]u8 = undefined;
+                    };
+                    if (self.text_label) |*text_label| {
+                        text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
+                    }
+                }
+            }.on_enter_scene,
+        },
+    };
+    try gloabal_world.registerEntities(&entities);
+
+    while (zeika.isRunning()) {
+        zeika.update();
+
+        if (zeika.isKeyJustPressed(.keyboard_escape, 0)) {
+            break;
+        }
+
+        // TODO: Prototyping things, eventually will categorize game objects so we don't have conditionals within the update loops
+
+        // Object Updates
+        for (gloabal_world.entities.items) |*entity| {
+            if (entity.update_func) |update| {
+                update(entity);
+            }
+        }
+
+        // Render
+        for (gloabal_world.entities.items) |*entity| {
+            if (entity.*.getSpriteDrawConfig()) |draw_config| {
+                Renderer.queueDrawSprite(&draw_config);
+            }
+            if (entity.getTextDrawConfig()) |draw_config| {
+                Renderer.queueDrawText(&draw_config);
+            }
+        }
+        Renderer.flushBatches();
+    }
+}
+
 pub fn getWorldMousePos( ) Vec2 {
     const mouse_pos: Vec2 = zeika.getMousePosition();
     const game_window_size: Vec2i = zeika.getWindowSize();
-    const game_resolution = Vec2i{ .x = 800, .y = 450 };
+    const game_resolution = game_properties.resolution;
     const global_camera = Camera{};
     const mouse_pixel_coord = Vec2{
         .x = math.mapToRange(f32, mouse_pos.x, 0.0, @floatFromInt(game_window_size.x), 0.0, game_resolution.x),

@@ -3,10 +3,20 @@ const std = @import("std");
 const data_db = @import("engine/object_data_db.zig");
 const game = @import("game/game.zig");
 
+const Entity = game.Entity;
 const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
 
+
+test "tag list test" {
+    const tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test", "okay" });
+    try std.testing.expectEqual(2, tag_list.tag_count);
+    try std.testing.expectEqualStrings("test", tag_list.tags[0]);
+    try std.testing.expect(tag_list.hasTag("test"));
+    try std.testing.expectEqualStrings("okay", tag_list.tags[1]);
+    try std.testing.expect(tag_list.hasTag("okay"));
+}
 
 test "object data db read and write test" {
     var data_db_inst = data_db.ObjectDataDB.init(std.heap.page_allocator);
