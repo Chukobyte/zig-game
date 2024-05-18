@@ -246,8 +246,8 @@ const Camera = struct {
 
 const GameProperties = struct {
     title: []const u8 = "ZigTest",
-    initial_window_size: Vec2i = Vec2i{ .x = 800, .y = 450 },
-    resolution: Vec2i = Vec2i{ .x = 800, .y = 450 },
+    initial_window_size: Vec2i = .{ .x = 800, .y = 450 },
+    resolution: Vec2i = .{ .x = 800, .y = 450 },
 };
 
 const game_properties = GameProperties{};
@@ -283,15 +283,15 @@ pub fn run() !void {
 
     const entities = [_]Entity{
         Entity{
-            .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 100.0 } },
-            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "sprite" }),
+            .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } },
+            .tag_list = Entity.Tags.initFromSlice(&.{ "sprite" }),
             .sprite = Sprite{
                 .texture = texture_handle,
-                .size = Vec2{ .x = 64.0, .y = 64.0 },
-                .draw_source = Rect2{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                .size = .{ .x = 64.0, .y = 64.0 },
+                .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
                 .modulate = Color.Blue,
             },
-            .collision = Collision{ .collider = Rect2{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
+            .collision = Collision{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
             .update_func = struct {
                 pub fn update(self: *Entity) void {
                     if (self.sprite) |*sprite| {
@@ -332,9 +332,9 @@ pub fn run() !void {
                 }.update,
         },
         Entity{
-            .transform = Transform2D{ .position = Vec2{ .x = 100.0, .y = 200.0 } },
-            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "text_label" }),
-            .text_label = TextLabel{
+            .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } },
+            .tag_list = Entity.Tags.initFromSlice(&.{ "text_label" }),
+            .text_label = .{
                 .font = default_font,
                 .color = Color.Red
             },

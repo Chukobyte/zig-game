@@ -14,8 +14,9 @@ var entity_has_exited_scene = false;
 
 test "world test" {
     var world = World.init(std.testing.allocator);
-    const entity_id = try world.registerEntity(.{
-            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test" }),
+    const entity_id = try world.registerEntity(
+        .{
+            .tag_list = Entity.Tags.initFromSlice(&.{ "test" }),
             .on_enter_scene_func = struct {
                 pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
             }.on_enter_scene,
@@ -34,7 +35,7 @@ test "world test" {
 }
 
 test "tag list test" {
-    const tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test", "okay" });
+    const tag_list = Entity.Tags.initFromSlice(&.{ "test", "okay" });
     try std.testing.expectEqual(2, tag_list.tag_count);
     try std.testing.expectEqualStrings("test", tag_list.tags[0]);
     try std.testing.expect(tag_list.hasTag("test"));
@@ -128,5 +129,5 @@ test "object data db json test" {
     const json_string = try std.json.stringifyAlloc(allocator, object_list, .{ .whitespace = .indent_2 });
     defer allocator.free(json_string);
     try std.testing.expectEqualStrings(json_to_parse,json_string);
-    std.debug.print("json_string = \n{s}\n", .{ json_string });
+    // std.debug.print("json_string = \n{s}\n", .{ json_string });
 }

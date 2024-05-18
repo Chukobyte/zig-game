@@ -348,7 +348,7 @@ pub const ObjectsList = struct {
         while (true) {
             // Object begin
             switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                .object_begin => { std.debug.print("expected object begin\n", .{}); },
+                .object_begin => {},
                 .array_end => return object_buffer.allocateSlice(alloc), // Empty object array
                 else => unreachable,
             }
@@ -361,13 +361,11 @@ pub const ObjectsList = struct {
                 .string, .allocated_string => |v| { object_name = try alloc.dupe(u8, v); },
                 else => unreachable,
             }
-            std.debug.print("Object name = {s}\n", .{ object_name });
             // Parse Id
             const id_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
             std.debug.assert(std.mem.eql(u8, "id", id_key));
             defer alloc.free(id_key);
             const object_id: u32 = try jsonNextAlloc(u32, alloc, source, options);
-            std.debug.print("Object id = {d}\n", .{ object_id });
 
             // Parse properties
             var properties_array: [16]Property = undefined;
@@ -429,7 +427,7 @@ pub const ObjectsList = struct {
                     properties_array[properties_count] = property;
                     properties_count += 1;
                     switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .object_end => { std.debug.print("expected property object end\n", .{}); },
+                        .object_end => {},
                         else => unreachable,
                     }
                 }
