@@ -137,7 +137,7 @@ pub const World = struct {
 
     /// Will register entity to the world.  Will create an owned copy of the passed in entity.
     pub inline fn registerEntity(self: *@This(), entity: Entity) !void {
-        try self.registerEntities([]Entity { entity });
+        try self.registerEntities(&[_]Entity{ entity });
     }
 
     /// Will register entities to the world.  Creates copies of the passed in entities and the world takes ownership.
@@ -148,6 +148,10 @@ pub const World = struct {
                 enter_scene_func(entity);
             }
         }
+    }
+
+    pub inline fn unregisterEntity(self: *@This(), entity: Entity) !void {
+        try self.unregisterEntities(&[_]Entity{ entity });
     }
 
     pub fn unregisterEntities(self: *@This(), entities: []const Entity) !void {

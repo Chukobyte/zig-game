@@ -9,8 +9,23 @@ const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
 
+var entity_has_entered_scene = false;
+var entity_has_exited_scene = false;
+
 test "world test" {
     var world = World.init(std.testing.allocator);
+    try world.registerEntity(.{
+            .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test" }),
+            .on_enter_scene_func = struct {
+                pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
+            }.on_enter_scene,
+            .on_exit_scene_func = struct {
+                pub fn on_exit_scene(self: *Entity) void { _ = self; entity_has_exited_scene = true; }
+            }.on_exit_scene,
+        }
+    );
+    // const test_entity = world.getEntityByTag("test").?;
+    // world.unregisterEntity(test_entity.*);
     defer world.deinit();
 }
 
