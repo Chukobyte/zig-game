@@ -14,7 +14,7 @@ var entity_has_exited_scene = false;
 
 test "world test" {
     var world = World.init(std.testing.allocator);
-    try world.registerEntity(.{
+    const entity_id = try world.registerEntity(.{
             .tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test" }),
             .on_enter_scene_func = struct {
                 pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
@@ -25,8 +25,12 @@ test "world test" {
         }
     );
     const test_entity = world.getEntityByTag("test").?;
-    world.unregisterEntity(test_entity.*);
+    try std.testing.expectEqual(entity_id, test_entity.id.?);
+    world.unregisterEntity(entity_id);
     defer world.deinit();
+
+    try std.testing.expect(entity_has_entered_scene);
+    try std.testing.expect(entity_has_exited_scene);
 }
 
 test "tag list test" {

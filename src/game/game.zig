@@ -85,6 +85,7 @@ pub const Entity = struct {
     sprite: ?Sprite = null,
     text_label: ?TextLabel = null,
     collision: ?Collision = null,
+    id: ?u32 = null, // Assigned from World
 
     on_enter_scene_func: ?*const fn(self: *@This()) void = null,
     on_exit_scene_func: ?*const fn(self: *@This()) void = null,
@@ -123,6 +124,7 @@ pub const Entity = struct {
 pub const World = struct {
     allocator: std.mem.Allocator,
     entities: std.ArrayList(Entity),
+    id_counter: u32 = 1,
 
     pub fn init(allocator: std.mem.Allocator) @This() {
         return @This(){
@@ -136,31 +138,45 @@ pub const World = struct {
     }
 
     /// Will register entity to the world.  Will create an owned copy of the passed in entity.
-    pub inline fn registerEntity(self: *@This(), entity: Entity) !void {
-        try self.registerEntities(&[_]Entity{ entity });
+    pub inline fn registerEntity(self: *@This(), entity: Entity) !u32 {
+        const ids = try self.registerEntities(&[_]Entity{ entity });
+        return ids[0];
     }
 
     /// Will register entities to the world.  Creates copies of the passed in entities and the world takes ownership.
-    pub fn registerEntities(self: *@This(), entities: []const Entity) !void {
+    pub fn registerEntities(self: *@This(), entities: []const Entity) ![]u32 {
+        const Static = struct {
+            const max_ids = 32;
+            var id_buffer: [max_ids]u32 = undefined;
+            var len: usize = 0;
+        };
+        Static.len = 0;
+        std.debug.assert(entities.len < Static.max_ids);
+
         try self.entities.appendSlice(entities);
         for (self.entities.items) |*entity| {
+            entity.id = self.id_counter;
+            self.id_counter += 1;
+            Static.id_buffer[Static.len] = entity.id.?;
+            Static.len += 1;
             if (entity.on_enter_scene_func) |enter_scene_func| {
                 enter_scene_func(entity);
             }
         }
+        return Static.id_buffer[0..Static.len];
     }
 
-    pub inline fn unregisterEntity(self: *@This(), entity: Entity) void {
-        self.unregisterEntities(&[_]Entity{ entity });
+    pub inline fn unregisterEntity(self: *@This(), id: u32) void {
+        self.unregisterEntities(&[_]u32{ id });
     }
 
-    pub fn unregisterEntities(self: *@This(), entities: []const Entity) void {
+    pub fn unregisterEntities(self: *@This(), ids: []const u32) void {
         var i: usize = 0;
         while (i < self.entities.items.len) : (i += 1) {
             var should_remove = false;
-            for (entities) |*entity| {
-                if (std.meta.eql(self.entities.items[i], entity.*)) {
-                    if (entity.on_exit_scene_func) |exit_scene_func| {
+            for (ids) |id| {
+                if (self.entities.items[i].id.? == id) {
+                    if (self.entities.items[i].on_exit_scene_func) |exit_scene_func| {
                         exit_scene_func(&self.entities.items[i]);
                     }
                     should_remove = true;
@@ -334,7 +350,7 @@ pub fn run() !void {
             }.on_enter_scene,
         },
     };
-    try gloabal_world.registerEntities(&entities);
+    _ = try gloabal_world.registerEntities(&entities);
 
     while (zeika.isRunning()) {
         zeika.update();
