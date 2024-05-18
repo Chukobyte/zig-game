@@ -136,7 +136,7 @@ pub const World = struct {
     }
 
     /// Will register entity to the world.  Will create an owned copy of the passed in entity.
-    pub fn registerEntity(self: *@This(), entity: Entity) !void {
+    pub inline fn registerEntity(self: *@This(), entity: Entity) !void {
         try self.registerEntities([]Entity { entity });
     }
 
@@ -146,6 +146,26 @@ pub const World = struct {
         for (self.entities.items) |*entity| {
             if (entity.on_enter_scene_func) |enter_scene_func| {
                 enter_scene_func(entity);
+            }
+        }
+    }
+
+    pub fn unregisterEntities(self: *@This(), entities: []const Entity) !void {
+        var i: usize = 0;
+        while (i < self.entities.items.len) : (i += 1) {
+            var should_remove = false;
+            for (entities) |*entity| {
+                if (std.mem.eql(Entity, self.entities.items[i], entity)) {
+                    if (entity.on_exit_scene_func) |exit_scene_func| {
+                        exit_scene_func(entity);
+                    }
+                    should_remove = true;
+                    break;
+                }
+            }
+            if (should_remove) {
+                try self.entities.swapRemove(i);
+                i -= 1; // Don't increment as the current index will hold the next value
             }
         }
     }
