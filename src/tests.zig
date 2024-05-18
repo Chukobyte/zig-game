@@ -24,8 +24,8 @@ test "world test" {
             }.on_exit_scene,
         }
     );
-    // const test_entity = world.getEntityByTag("test").?;
-    // world.unregisterEntity(test_entity.*);
+    const test_entity = world.getEntityByTag("test").?;
+    world.unregisterEntity(test_entity.*);
     defer world.deinit();
 }
 

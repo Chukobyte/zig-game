@@ -150,26 +150,28 @@ pub const World = struct {
         }
     }
 
-    pub inline fn unregisterEntity(self: *@This(), entity: Entity) !void {
-        try self.unregisterEntities(&[_]Entity{ entity });
+    pub inline fn unregisterEntity(self: *@This(), entity: Entity) void {
+        self.unregisterEntities(&[_]Entity{ entity });
     }
 
-    pub fn unregisterEntities(self: *@This(), entities: []const Entity) !void {
+    pub fn unregisterEntities(self: *@This(), entities: []const Entity) void {
         var i: usize = 0;
         while (i < self.entities.items.len) : (i += 1) {
             var should_remove = false;
             for (entities) |*entity| {
-                if (std.mem.eql(Entity, self.entities.items[i], entity)) {
+                if (std.meta.eql(self.entities.items[i], entity.*)) {
                     if (entity.on_exit_scene_func) |exit_scene_func| {
-                        exit_scene_func(entity);
+                        exit_scene_func(&self.entities.items[i]);
                     }
                     should_remove = true;
                     break;
                 }
             }
             if (should_remove) {
-                try self.entities.swapRemove(i);
-                i -= 1; // Don't increment as the current index will hold the next value
+                _ = self.entities.swapRemove(i);
+                if (i > 0) {
+                    i -= 1; // Don't increment as the current index will hold the next value
+                }
             }
         }
     }
