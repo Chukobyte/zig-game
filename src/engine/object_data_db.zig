@@ -149,7 +149,7 @@ pub const ObjectDataDB = struct {
         return ObjectError.FailedToFindProperty;
     }
 
-    fn findProperty(self: *@This(), object: *Object, key: []const u8) ?*Property {
+    pub fn findProperty(self: *@This(), object: *Object, key: []const u8) ?*Property {
         _ = self;
         for (object.properties.items) |*property| {
             if (std.mem.eql(u8, property.key, key)) {
@@ -169,6 +169,31 @@ pub const ObjectDataDB = struct {
             property.?.type = PropertyType.getTypeFromRealType(T);
         }
         return property.?;
+    }
+
+    pub fn removeProperty(self: *@This(), object: *Object, property: *Property) void {
+        if (self.findProperty(object, property.key)) |found_prop| {
+            self.removePropertyByKey(object, found_prop.key);
+        }
+    }
+
+    pub fn removePropertyByKey(self: *@This(), object: *Object, key: []const u8) void {
+        var remove_index: ?usize = null;
+        var i: usize = 0;
+        while (i < object.properties.items.len) : (i += 1) {
+            if (std.mem.eql(u8, key, object.properties.items[i].key)) {
+                remove_index = i;
+                break;
+            }
+        }
+        if (remove_index) |index| {
+            const removed_prop = object.properties.items[index];
+            if (removed_prop.type == .string) {
+                self.allocator.free(removed_prop.value.string);
+            }
+            self.allocator.free(removed_prop.key);
+            _ = object.properties.swapRemove(index);
+        }
     }
 };
 

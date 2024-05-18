@@ -183,6 +183,10 @@ pub const World = struct {
     }
 };
 
+pub const Scene = struct {
+
+};
+
 pub const Hero = struct {
     pub const Stats = struct {
         health: i32,
