@@ -23,10 +23,11 @@ const Collision = core.Collision;
 const Camera = core.Camera;
 const GameProperties = core.GameProperties;
 
-const game_properties = GameProperties{};
+var game_properties = GameProperties{};
 var gloabal_world: World = undefined;
 
-pub fn init() !void {
+pub fn init(props: GameProperties) !void {
+    game_properties = props;
     try zeika.initAll(
         game_properties.title,
         game_properties.initial_window_size.x,
@@ -160,8 +161,8 @@ pub fn getWorldMousePos( ) Vec2 {
     const game_resolution = game_properties.resolution;
     const global_camera = Camera{};
     const mouse_pixel_coord = Vec2{
-        .x = math.mapToRange(f32, mouse_pos.x, 0.0, @floatFromInt(game_window_size.x), 0.0, game_resolution.x),
-        .y = math.mapToRange(f32, mouse_pos.y, 0.0, @floatFromInt(game_window_size.y), 0.0, game_resolution.y)
+        .x = math.mapToRange(f32, mouse_pos.x, 0.0, @floatFromInt(game_window_size.x), 0.0, @floatFromInt(game_resolution.x)),
+        .y = math.mapToRange(f32, mouse_pos.y, 0.0, @floatFromInt(game_window_size.y), 0.0, @floatFromInt(game_resolution.y))
     };
     const mouse_world_pos = Vec2{
         .x = (global_camera.viewport.x + global_camera.offset.x + mouse_pixel_coord.x) * global_camera.zoom.x,
