@@ -9,11 +9,10 @@ const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
 
-
-// test "world test" {
-//     var world = World.init(std.testing.allocator);
-//     defer world.deinit();
-// }
+test "world test" {
+    var world = World.init(std.testing.allocator);
+    defer world.deinit();
+}
 
 test "tag list test" {
     const tag_list = Entity.Tags.initFromSlice(&[_][]const u8{ "test", "okay" });

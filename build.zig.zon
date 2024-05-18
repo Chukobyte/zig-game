@@ -1,7 +1,7 @@
 .{
     .name = "game",
     .version = "0.0.1",
-    .minimum_zig_version = "0.12.0-dev.3480+9dac8db2d", // Version used to build project and deps
+    .minimum_zig_version = "0.12.0", // Version used to build project and deps
     .paths = .{
         "src",
         "build.zig",
@@ -9,8 +9,8 @@
     },
     .dependencies = .{
         .zeika = .{
-            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.11.tar.gz",
-            .hash = "122045e6aa54f3de1b75a1ec2468011b84a3fe5df9f743ce24f0c3c0da58314b068d",
+            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.12.tar.gz",
+            .hash = "12208b40073243f457e1197c3c8ea7b7fc16f8ad170f22c8c00adf4582c2cdd9aadd",
         },
     },
 }

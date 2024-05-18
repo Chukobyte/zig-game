@@ -36,8 +36,11 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/tests.zig" },
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
     });
+    test_exe.root_module.addImport("zeika", zeika_dep.module("zeika"));
     const run_test = b.addRunArtifact(test_exe);
+    run_test.has_side_effects = true;
     const test_step = b.step("test", "Run tests for the game");
     test_step.dependOn(&run_test.step);
 }
