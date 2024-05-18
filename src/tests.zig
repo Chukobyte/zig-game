@@ -1,10 +1,11 @@
 const std = @import("std");
 
 const data_db = @import("engine/object_data_db.zig");
+const core = @import("game/core.zig");
 const game = @import("game/game.zig");
 
-const World = game.World;
-const Entity = game.Entity;
+const World = core.World;
+const Entity = core.Entity;
 const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
