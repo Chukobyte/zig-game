@@ -80,9 +80,9 @@ pub const Entity = struct {
     pub const Tags = TagList(4);
 
     pub const Interface = struct {
-        on_enter_scene_func: ?*const fn(self: *Entity) void = null,
-        on_exit_scene_func: ?*const fn(self: *Entity) void = null,
-        update_func: ?*const fn(self: *Entity) void = null,
+        on_enter_scene: ?*const fn(self: *Entity) void = null,
+        on_exit_scene: ?*const fn(self: *Entity) void = null,
+        update: ?*const fn(self: *Entity) void = null,
     };
 
     transform: Transform2D = Transform2D.Identity,
@@ -163,8 +163,8 @@ pub const World = struct {
             self.id_counter += 1;
             Static.id_buffer[Static.len] = entity.id.?;
             Static.len += 1;
-            if (entity.interface.on_enter_scene_func) |enter_scene_func| {
-                enter_scene_func(entity);
+            if (entity.interface.on_enter_scene) |enter_scene| {
+                enter_scene(entity);
             }
         }
         return Static.id_buffer[0..Static.len];

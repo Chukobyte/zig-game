@@ -49,11 +49,65 @@ pub fn run() !void {
     defer Texture.deinit(texture_handle);
 
     const default_font: Font = Font.initFromMemory(
-            assets.DefaultFont.data,
-            assets.DefaultFont.len,
-            .{ .font_size = 16, .apply_nearest_neighbor = true }
+        assets.DefaultFont.data,
+        assets.DefaultFont.len,
+        .{ .font_size = 16, .apply_nearest_neighbor = true }
     );
     defer default_font.deinit();
+
+    const sprite_interface = Entity.Interface{
+        .update = struct {
+            pub fn update(self: *Entity) void {
+                if (self.sprite) |*sprite| {
+                    if (self.collision) |*collision| {
+                        const world_mouse_pos: Vec2 = getWorldMousePos();
+                        const entity_collider = Rect2{
+                            .x = self.transform.position.x + collision.collider.x,
+                            .y = self.transform.position.y + collision.collider.y,
+                            .w = collision.collider.w,
+                            .h = collision.collider.h
+                        };
+                        const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
+                        if (entity_collider.doesOverlap(&mouse_collider)) {
+                            if (zeika.isKeyPressed(.mouse_button_left, 0)) {
+                                sprite.modulate = Color.White;
+                            } else {
+                                sprite.modulate = Color.Red;
+                            }
+
+                            if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
+                                if (gloabal_world.getEntityByTag("text_label")) |text_label_entity| {
+                                    if (text_label_entity.text_label) |*text_label| {
+                                        const StaticData = struct {
+                                            var text_buffer: [256]u8 = undefined;
+                                            var money: i32 = 0;
+                                        };
+                                        StaticData.money += 1;
+                                        text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+                                    }
+                                }
+                            }
+                        } else {
+                            sprite.modulate = Color.Blue;
+                        }
+                    }
+                }
+            }
+        }.update,
+    };
+
+    const text_label_interface = Entity.Interface{
+        .on_enter_scene = struct {
+            pub fn on_enter_scene(self: *Entity) void  {
+                const StaticData = struct {
+                    var text_buffer: [256]u8 = undefined;
+                };
+                if (self.text_label) |*text_label| {
+                    text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
+                }
+            }
+        }.on_enter_scene,
+    };
 
     const entities = [_]Entity{
         Entity{
@@ -66,46 +120,7 @@ pub fn run() !void {
                 .modulate = Color.Blue,
             },
             .collision = Collision{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
-            .interface = .{
-                .update_func = struct {
-                    pub fn update(self: *Entity) void {
-                        if (self.sprite) |*sprite| {
-                            if (self.collision) |*collision| {
-                                const world_mouse_pos: Vec2 = getWorldMousePos();
-                                const entity_collider = Rect2{
-                                    .x = self.transform.position.x + collision.collider.x,
-                                    .y = self.transform.position.y + collision.collider.y,
-                                    .w = collision.collider.w,
-                                    .h = collision.collider.h
-                                };
-                                const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
-                                if (entity_collider.doesOverlap(&mouse_collider)) {
-                                    if (zeika.isKeyPressed(.mouse_button_left, 0)) {
-                                        sprite.modulate = Color.White;
-                                    } else {
-                                        sprite.modulate = Color.Red;
-                                    }
-
-                                    if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
-                                        if (gloabal_world.getEntityByTag("text_label")) |text_label_entity| {
-                                            if (text_label_entity.text_label) |*text_label| {
-                                                const StaticData = struct {
-                                                    var text_buffer: [256]u8 = undefined;
-                                                    var money: i32 = 0;
-                                                };
-                                                StaticData.money += 1;
-                                                text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    sprite.modulate = Color.Blue;
-                                }
-                            }
-                        }
-                    }
-                }.update,
-            },
+            .interface = sprite_interface,
         },
         Entity{
             .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } },
@@ -114,18 +129,7 @@ pub fn run() !void {
                 .font = default_font,
                 .color = Color.Red
             },
-            .interface = .{
-                .on_enter_scene_func = struct {
-                    pub fn on_enter_scene(self: *Entity) void  {
-                        const StaticData = struct {
-                            var text_buffer: [256]u8 = undefined;
-                        };
-                        if (self.text_label) |*text_label| {
-                            text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
-                        }
-                    }
-                }.on_enter_scene,
-            },
+            .interface = text_label_interface,
         },
     };
     _ = try gloabal_world.registerEntities(&entities);
@@ -141,7 +145,7 @@ pub fn run() !void {
 
         // Object Updates
         for (gloabal_world.entities.items) |*entity| {
-            if (entity.interface.update_func) |update| {
+            if (entity.interface.update) |update| {
                 update(entity);
             }
         }
