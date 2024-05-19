@@ -18,12 +18,14 @@ test "world test" {
     const entity_id = try world.registerEntity(
         .{
             .tag_list = Entity.Tags.initFromSlice(&.{ "test" }),
-            .on_enter_scene_func = struct {
-                pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
-            }.on_enter_scene,
-            .on_exit_scene_func = struct {
-                pub fn on_exit_scene(self: *Entity) void { _ = self; entity_has_exited_scene = true; }
-            }.on_exit_scene,
+            .interface = .{
+                .on_enter_scene_func = struct {
+                    pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
+                }.on_enter_scene,
+                .on_exit_scene_func = struct {
+                    pub fn on_exit_scene(self: *Entity) void { _ = self; entity_has_exited_scene = true; }
+                }.on_exit_scene,
+            },
         }
     );
     const test_entity = world.getEntityByTag("test").?;

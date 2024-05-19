@@ -79,6 +79,12 @@ pub fn TagList(max_tags: comptime_int) type {
 pub const Entity = struct {
     pub const Tags = TagList(4);
 
+    pub const Interface = struct {
+        on_enter_scene_func: ?*const fn(self: *Entity) void = null,
+        on_exit_scene_func: ?*const fn(self: *Entity) void = null,
+        update_func: ?*const fn(self: *Entity) void = null,
+    };
+
     transform: Transform2D = Transform2D.Identity,
     z_index: i32 = 0,
     tag_list: ?Tags = null,
@@ -87,9 +93,7 @@ pub const Entity = struct {
     collision: ?Collision = null,
     id: ?u32 = null, // Assigned from World
 
-    on_enter_scene_func: ?*const fn(self: *@This()) void = null,
-    on_exit_scene_func: ?*const fn(self: *@This()) void = null,
-    update_func: ?*const fn(self: *@This()) void = null,
+    interface: Interface = .{},
 
     pub fn getSpriteDrawConfig(self: *const @This()) ?Renderer.SpriteDrawQueueConfig {
         if (self.sprite) |sprite| {
@@ -159,7 +163,7 @@ pub const World = struct {
             self.id_counter += 1;
             Static.id_buffer[Static.len] = entity.id.?;
             Static.len += 1;
-            if (entity.on_enter_scene_func) |enter_scene_func| {
+            if (entity.interface.on_enter_scene_func) |enter_scene_func| {
                 enter_scene_func(entity);
             }
         }
@@ -176,7 +180,7 @@ pub const World = struct {
             var should_remove = false;
             for (ids) |id| {
                 if (self.entities.items[i].id.? == id) {
-                    if (self.entities.items[i].on_exit_scene_func) |exit_scene_func| {
+                    if (self.entities.items[i].interface.on_exit_scene_func) |exit_scene_func| {
                         exit_scene_func(&self.entities.items[i]);
                     }
                     should_remove = true;
