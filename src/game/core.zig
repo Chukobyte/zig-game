@@ -180,8 +180,8 @@ pub const World = struct {
             var should_remove = false;
             for (ids) |id| {
                 if (self.entities.items[i].id.? == id) {
-                    if (self.entities.items[i].interface.on_exit_scene_func) |exit_scene_func| {
-                        exit_scene_func(&self.entities.items[i]);
+                    if (self.entities.items[i].interface.on_exit_scene) |on_exit_scene| {
+                        on_exit_scene(&self.entities.items[i]);
                     }
                     should_remove = true;
                     break;

@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const math = @import("zeika").math;
+
 const data_db = @import("engine/object_data_db.zig");
 const core = @import("game/core.zig");
 const game = @import("game/game.zig");
@@ -13,16 +15,112 @@ const Property = data_db.Property;
 var entity_has_entered_scene = false;
 var entity_has_exited_scene = false;
 
+const DialogueComponent = struct {
+    text: []const u8,
+};
+
+const TransformComponent = struct {
+    transform: math.Transform2D,
+};
+
+const ComponentType = enum(u32) {
+    dialogue = 0,
+    transform,
+
+    count,
+
+    pub inline fn getFlag(self: @This()) u32 {
+        const component_index: u5 = @intCast(@intFromEnum(self));
+        const component_flag: u32 = @as(u32, 1) << component_index;
+        return component_flag;
+    }
+
+    pub inline fn getCount() usize {
+        return @intFromEnum(ComponentType.count);
+    }
+
+    pub fn getRealType(comptime self: @This()) type {
+        switch (self) {
+            .dialogue => return DialogueComponent,
+            .transform => return TransformComponent,
+            else => unreachable,
+        }
+    }
+
+    pub fn getTypeIndex(comptime T: type) @This() {
+        switch(T) {
+            DialogueComponent => return .dialogue,
+            TransformComponent => return .transform,
+            else => unreachable,
+        }
+    }
+};
+
+const ComponentDB = struct {
+    components: [ComponentType.getCount()]*anyopaque = undefined,
+    component_count: usize = 0,
+    component_flags: u32 = 0,
+
+    fn addComponent(self: *@This(), comptime T: type, component: *T) void {
+        const component_type: ComponentType = ComponentType.getTypeIndex(T);
+        if (!self.hasComponent(T)) {
+            self.component_count += 1;
+            self.component_flags |= component_type.getFlag();
+        }
+        const index: usize = @intFromEnum(component_type);
+        self.components[index] = component;
+    }
+
+    fn getComponent(self: *@This(), comptime T: type) ?*T {
+        const component_type: ComponentType = ComponentType.getTypeIndex(T);
+        const index: usize = @intFromEnum(component_type);
+        return @ptrCast(self.components[index]);
+    }
+
+    fn removeComponent(self: *@This(), comptime T: type) ?*T {
+        const component_type: ComponentType = ComponentType.getTypeIndex(T);
+        if (self.getComponent(T, component_type)) |component| {
+            const index: usize = @intFromEnum(component_type);
+            self.components[index] = null;
+            self.component_count -= 1;
+            self.component_flags &= ~(component_type.getFlag());
+            return component;
+        }
+    }
+
+    inline fn hasComponent(self: *@This(), comptime T: type) bool {
+        const component_type: ComponentType = ComponentType.getTypeIndex(T);
+        const component_flag = component_type.getFlag();
+        return (self.component_flags & component_flag) == component_flag;
+    }
+};
+
+test "generic component test" {
+    var components_db = ComponentDB{};
+
+    var dialogue_comp = DialogueComponent{ .text = "Test text yeah!" };
+    var transform_comp = TransformComponent{ .transform = math.Transform2D.Identity };
+
+    try std.testing.expect(components_db.hasComponent(DialogueComponent) == false);
+    try std.testing.expect(components_db.hasComponent(TransformComponent) == false);
+
+    components_db.addComponent(DialogueComponent, &dialogue_comp);
+    components_db.addComponent(TransformComponent, &transform_comp);
+
+    try std.testing.expect(components_db.hasComponent(DialogueComponent));
+    try std.testing.expect(components_db.hasComponent(TransformComponent));
+}
+
 test "world test" {
     var world = World.init(std.testing.allocator);
     const entity_id = try world.registerEntity(
         .{
             .tag_list = Entity.Tags.initFromSlice(&.{ "test" }),
             .interface = .{
-                .on_enter_scene_func = struct {
+                .on_enter_scene = struct {
                     pub fn on_enter_scene(self: *Entity) void { _ = self; entity_has_entered_scene = true; }
                 }.on_enter_scene,
-                .on_exit_scene_func = struct {
+                .on_exit_scene = struct {
                     pub fn on_exit_scene(self: *Entity) void { _ = self; entity_has_exited_scene = true; }
                 }.on_exit_scene,
             },
