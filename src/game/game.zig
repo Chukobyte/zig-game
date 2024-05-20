@@ -6,6 +6,7 @@ const math = zeika.math;
 const assets = @import("assets");
 
 const core = @import("core.zig");
+const ec = @import("../engine/entity_component/entity_component.zig");
 
 const Renderer = zeika.Renderer;
 const Texture = zeika.Texture;
@@ -22,6 +23,62 @@ const TextLabel = core.TextLabel;
 const Collision = core.Collision;
 const Camera = core.Camera;
 const GameProperties = core.GameProperties;
+
+const TransformComponent = struct {
+    transform: math.Transform2D = math.Transform2D.Identity,
+};
+
+const SpriteComponent = struct {
+    sprite: Sprite,
+};
+
+const TextLabelComponent = struct {
+    text_label: TextLabel,
+};
+
+const ComponentInterface = struct {
+    const ECEntity = ec.EntityT(u32, @This(), 4, 3);
+
+    pub fn setComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type, component: *T) !void {
+        const comp_index: usize = getTypeIndex(T);
+        if (!hasComponent(entity, T)) {
+            const new_comp: *T = try allocator.create(T);
+            new_comp.* = component.*;
+            entity.components[comp_index] = new_comp;
+        }
+    }
+
+    pub fn getComponent(entity: *ECEntity, comptime T: type) ?*T {
+        const comp_index: usize = getTypeIndex(T);
+        if (entity.components[comp_index]) |comp| {
+            return @alignCast(@ptrCast(comp));
+        }
+        return null;
+    }
+
+    pub fn removeComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type) void {
+        if (hasComponent(entity, T)) {
+            const comp_index: usize = getTypeIndex(T);
+            const comp_ptr: *T = @alignCast(@ptrCast(entity.components[comp_index]));
+            allocator.destroy(comp_ptr);
+            entity.components[comp_index] = null;
+        }
+    }
+
+    pub fn hasComponent(entity: *ECEntity, comptime T: type) bool {
+        const comp_index: usize = getTypeIndex(T);
+        return entity.components[comp_index] != null;
+    }
+
+    fn getTypeIndex(comptime T: type) usize {
+        switch (T) {
+            TransformComponent => return 0,
+            SpriteComponent => return 1,
+            TextLabelComponent => return 2,
+            else => unreachable,
+        }
+    }
+};
 
 var game_properties = GameProperties{};
 var gloabal_world: World = undefined;
@@ -45,6 +102,10 @@ pub fn deinit() void {
 }
 
 pub fn run() !void {
+    const ECContext = ec.ECContext(u32, ComponentInterface, &.{ TransformComponent, SpriteComponent, TextLabelComponent });
+    var ec_context = ECContext.init(std.heap.page_allocator);
+    defer ec_context.deinit();
+
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
 

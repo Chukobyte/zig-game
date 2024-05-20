@@ -41,10 +41,18 @@ pub fn EntityT(comptime IdType: type, comptime ComponentInterface: anytype, tag_
     return struct {
         const EntityTRef = @This();
 
+        const Interface = struct {
+            init: ?*const fn(self: *EntityTRef) void = null,
+            deinit: ?*const fn(self: *EntityTRef) void = null,
+            update: ?*const fn(self: *EntityTRef) void = null,
+        };
+
         id: ?IdType = null,
         tag_list: ?TagList(tag_max) = null,
-        components: [component_max]?*anyopaque = undefined,
         allocator: std.mem.Allocator = undefined,
+
+        components: [component_max]?*anyopaque = undefined,
+        interface: Interface = .{},
 
         pub inline fn setComponent(self: *@This(), comptime T: type, component: *T) !void {
             try ComponentInterface.setComponent(self, self.allocator, T, component);
@@ -87,31 +95,41 @@ pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, co
         }
 
         /// Creates an entity using the passed in template, only really copying components for now
-        pub fn createEntity(self: *@This(), entity_template: *const Entity) !*Entity {
+        pub fn initEntity(self: *@This(), entity_template: *const Entity) !*Entity {
             const new_entity: *Entity = try self.entities.addOne();
             new_entity.* = entity_template.*;
             new_entity.allocator = self.allocator;
             new_entity.id = self.id_counter;
             self.id_counter += 1;
+            if (new_entity.interface.init) |entity_init| {
+                entity_init(new_entity);
+            }
             return new_entity;
         }
 
-        // inline for (component_types) |comp_type| {
-        //     std.debug.print("comp_info = {any}\n", .{ comp_type });
-        // }
+        pub fn deinitEntity(self: *@This(), id: IdType) void {
+            if (self.getEntity(id)) |entity| {
+                if (entity.interface.deinit) |entity_deinit| {
+                    entity_deinit(entity);
+                }
+            }
+        }
 
+        pub fn updateEntities(self: *@This()) void {
+            for (self.entities.items) |*entity| {
+                if (entity.interface.update) |entity_update| {
+                    entity_update(entity);
+                }
+            }
+        }
 
-        // const Interface = struct {
-        // _ = struct {
-        //     on_enter_scene: ?*const fn(self: *Entity) void = null,
-        //     on_exit_scene: ?*const fn(self: *Entity) void = null,
-        //     update: ?*const fn(self: *Entity) void = null,
-        // };
-
-        // const fields = switch (type_info) {
-        //     .Struct => |struct_info| struct_info.fields,
-        //     else => @compileError("Expected a struct type"),
-        // };
-        // _ = fields;
+        pub fn getEntity(self: *@This(), id: IdType) ?*Entity {
+            for (self.entities.items) |*entity| {
+                if (id == entity.id.?) {
+                    return entity;
+                }
+            }
+            return null;
+        }
     };
 }
