@@ -3,6 +3,7 @@ const std = @import("std");
 const math = @import("zeika").math;
 
 const data_db = @import("engine/object_data_db.zig");
+const ec = @import("engine/entity_component/entity_component.zig");
 const core = @import("game/core.zig");
 const game = @import("game/game.zig");
 
@@ -29,6 +30,8 @@ const ComponentType = enum(u32) {
 
     count,
 
+    //--- ComponentDB interface ---//
+
     pub inline fn getFlag(self: @This()) u32 {
         const component_index: u5 = @intCast(@intFromEnum(self));
         const component_flag: u32 = @as(u32, 1) << component_index;
@@ -39,16 +42,8 @@ const ComponentType = enum(u32) {
         return @intFromEnum(ComponentType.count);
     }
 
-    pub fn getRealType(comptime self: @This()) type {
-        switch (self) {
-            .dialogue => return DialogueComponent,
-            .transform => return TransformComponent,
-            else => unreachable,
-        }
-    }
-
-    pub fn getTypeIndex(comptime T: type) @This() {
-        switch(T) {
+    pub inline fn getTypeIndex(comptime T: type) @This() {
+        switch (T) {
             DialogueComponent => return .dialogue,
             TransformComponent => return .transform,
             else => unreachable,
@@ -56,47 +51,142 @@ const ComponentType = enum(u32) {
     }
 };
 
-const ComponentDB = struct {
-    components: [ComponentType.getCount()]*anyopaque = undefined,
-    component_count: usize = 0,
-    component_flags: u32 = 0,
+fn ComponentDB(comptime ComponentT: type) type {
+    return struct {
+        components: [ComponentT.getCount()]*anyopaque = undefined,
+        component_count: usize = 0,
+        component_flags: u32 = 0,
 
-    fn addComponent(self: *@This(), comptime T: type, component: *T) void {
-        const component_type: ComponentType = ComponentType.getTypeIndex(T);
-        if (!self.hasComponent(T)) {
-            self.component_count += 1;
-            self.component_flags |= component_type.getFlag();
-        }
-        const index: usize = @intFromEnum(component_type);
-        self.components[index] = component;
-    }
-
-    fn getComponent(self: *@This(), comptime T: type) ?*T {
-        const component_type: ComponentType = ComponentType.getTypeIndex(T);
-        const index: usize = @intFromEnum(component_type);
-        return @ptrCast(self.components[index]);
-    }
-
-    fn removeComponent(self: *@This(), comptime T: type) ?*T {
-        const component_type: ComponentType = ComponentType.getTypeIndex(T);
-        if (self.getComponent(T, component_type)) |component| {
+        fn addComponent(self: *@This(), comptime T: type, component: *T) void {
+            const component_type: ComponentT = ComponentT.getTypeIndex(T);
+            if (!self.hasComponent(T)) {
+                self.component_count += 1;
+                self.component_flags |= component_type.getFlag();
+            }
             const index: usize = @intFromEnum(component_type);
-            self.components[index] = null;
-            self.component_count -= 1;
-            self.component_flags &= ~(component_type.getFlag());
-            return component;
+            self.components[index] = component;
+        }
+
+        fn getComponent(self: *@This(), comptime T: type) ?*T {
+            const component_type: ComponentT = ComponentT.getTypeIndex(T);
+            const index: usize = @intFromEnum(component_type);
+            return @ptrCast(self.components[index]);
+        }
+
+        fn removeComponent(self: *@This(), comptime T: type) ?*T {
+            const component_type: ComponentT = ComponentT.getTypeIndex(T);
+            if (self.getComponent(T, component_type)) |component| {
+                const index: usize = @intFromEnum(component_type);
+                self.components[index] = null;
+                self.component_count -= 1;
+                self.component_flags &= ~(component_type.getFlag());
+                return component;
+            }
+        }
+
+        inline fn hasComponent(self: *@This(), comptime T: type) bool {
+            const component_type: ComponentT = ComponentT.getTypeIndex(T);
+            const component_flag = component_type.getFlag();
+            return (self.component_flags & component_flag) == component_flag;
+        }
+    };
+}
+
+// fn handleComponents(comptime component_types: []const type) void {
+//     inline for (component_types) |comp_type| {
+//         std.debug.print("comp_info = {any}\n", .{ comp_type });
+//     }
+    // const fields = switch (type_info) {
+    //     .Struct => |struct_info| struct_info.fields,
+    //     else => @compileError("Expected a struct type"),
+    // };
+    // _ = fields;
+// }
+
+// fn ECContext(comptime component_types: []const type) type {
+//     return struct {
+//         const total_components = component_types.len;
+//
+//         pub const Entity = struct {
+//             id: ?u32 = null, // Assigned from World
+//             components: [total_components]*anyopaque = undefined,
+//
+//
+//             interface: Interface = .{},
+//
+//         };
+//     };
+// }
+
+const ComponentInterface = struct {
+    const ECEntity = ec.EntityT(u32, @This(), 4, 2);
+
+    pub inline fn setComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type, component: *T) !void {
+        const comp_index: usize = getTypeIndex(T);
+        if (!hasComponent(entity, T)) {
+            const new_comp: *T = try allocator.create(T);
+            new_comp.* = component.*;
+            entity.components[comp_index] = new_comp;
         }
     }
 
-    inline fn hasComponent(self: *@This(), comptime T: type) bool {
-        const component_type: ComponentType = ComponentType.getTypeIndex(T);
-        const component_flag = component_type.getFlag();
-        return (self.component_flags & component_flag) == component_flag;
+    pub inline fn getComponent(entity: *ECEntity, comptime T: type) ?*T {
+        const comp_index: usize = getTypeIndex(T);
+        if (entity.components[comp_index]) |comp| {
+            return @alignCast(@ptrCast(comp));
+        }
+        return null;
+    }
+
+    pub inline fn removeComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type) void {
+        if (hasComponent(entity, T)) {
+            const comp_index: usize = getTypeIndex(T);
+            const comp_ptr: *T = @alignCast(@ptrCast(entity.components[comp_index]));
+            allocator.destroy(comp_ptr);
+            entity.components[comp_index] = null;
+        }
+    }
+
+    pub inline fn hasComponent(entity: *ECEntity, comptime T: type) bool {
+        const comp_index: usize = getTypeIndex(T);
+        return entity.components[comp_index] != null;
+    }
+
+    fn getTypeIndex(comptime T: type) usize {
+        switch (T) {
+            DialogueComponent => return 0,
+            TransformComponent => return 1,
+            else => unreachable,
+        }
     }
 };
 
+
+test "entity component test" {
+    const allocator = std.testing.allocator;
+
+    const TestECContext = ec.ECContext(u32, ComponentInterface, &.{ DialogueComponent, TransformComponent });
+    var ec_context = TestECContext.init(allocator);
+    defer ec_context.deinit();
+
+    var test_entity = try ec_context.createEntity(&.{});
+    var dialogue_comp = DialogueComponent{ .text = "Test speech!" };
+    try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
+    try test_entity.setComponent(DialogueComponent, &dialogue_comp);
+    try std.testing.expect(test_entity.hasComponent(DialogueComponent));
+
+    if (test_entity.getComponent(DialogueComponent)) |found_comp| {
+        try std.testing.expectEqualStrings("Test speech!", found_comp.text);
+    }
+
+    test_entity.removeComponent(DialogueComponent);
+    try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
+}
+
 test "generic component test" {
-    var components_db = ComponentDB{};
+    // handleComponents(&.{ DialogueComponent, TransformComponent });
+
+    var components_db = ComponentDB(ComponentType){};
 
     var dialogue_comp = DialogueComponent{ .text = "Test text yeah!" };
     var transform_comp = TransformComponent{ .transform = math.Transform2D.Identity };
