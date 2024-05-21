@@ -27,13 +27,15 @@ const TransformComponent = struct {
 var has_test_entity_init = false;
 var has_test_entity_deinit = false;
 
-test "entity component test" {
+test "type list test" {
     const TestTypeList = ec.TypeList(&.{ DialogueComponent, TransformComponent });
     try std.testing.expectEqual(0, TestTypeList.getIndex(DialogueComponent));
     try std.testing.expectEqual(1, TestTypeList.getIndex(TransformComponent));
     try std.testing.expectEqual(DialogueComponent, TestTypeList.getType(0));
     try std.testing.expectEqual(TransformComponent, TestTypeList.getType(1));
+}
 
+test "entity component test" {
     const allocator = std.testing.allocator;
 
     const TestECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });
