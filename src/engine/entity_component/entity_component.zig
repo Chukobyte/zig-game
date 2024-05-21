@@ -77,7 +77,7 @@ pub fn EntityT(comptime IdType: type, comptime component_types: []const type, ta
         components: [component_types.len]?*anyopaque = undefined,
         interface: Interface = .{},
 
-        pub fn setComponent(self: *@This(), comptime T: type, component: *T) !void {
+        pub fn setComponent(self: *@This(), comptime T: type, component: *const T) !void {
             const comp_index: usize = ComponentTypeList.getIndex(T);
             if (!hasComponent(self, T)) {
                 const new_comp: *T = try self.allocator.create(T);

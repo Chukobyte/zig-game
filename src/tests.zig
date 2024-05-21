@@ -67,9 +67,8 @@ test "entity component test" {
     };
     var test_entity = try ec_context.initEntity(&test_entity_template);
     try std.testing.expect(test_entity.hasComponent(TransformComponent));
-    var dialogue_comp = DialogueComponent{ .text = "Test speech!" };
     try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
-    try test_entity.setComponent(DialogueComponent, &dialogue_comp);
+    try test_entity.setComponent(DialogueComponent, &.{ .text = "Test speech!" });
     try std.testing.expect(test_entity.hasComponent(DialogueComponent));
 
     if (test_entity.getComponent(DialogueComponent)) |found_comp| {
