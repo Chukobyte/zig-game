@@ -36,6 +36,21 @@ const ComponentInterface = struct {
         }
     }
 
+    pub fn setComponentByIndex(entity: *ECEntity, allocator: std.mem.Allocator, index: comptime_int, component: *anyopaque) !void {
+        const T: type = switch (index) {
+            0 => DialogueComponent,
+            1 => TransformComponent,
+            else => unreachable,
+        };
+
+        if (entity.components[index] == null) {
+            const new_comp: *T = try allocator.create(T);
+            const comp_ptr: *T = @alignCast(@ptrCast(component));
+            new_comp.* = comp_ptr.*;
+            entity.components[index] = new_comp;
+        }
+    }
+
     pub fn getComponent(entity: *ECEntity, comptime T: type) ?*T {
         const comp_index: usize = getTypeIndex(T);
         if (entity.components[comp_index]) |comp| {
@@ -58,10 +73,18 @@ const ComponentInterface = struct {
         return entity.components[comp_index] != null;
     }
 
-    fn getTypeIndex(comptime T: type) usize {
+    pub fn getTypeIndex(comptime T: type) usize {
         switch (T) {
             DialogueComponent => return 0,
             TransformComponent => return 1,
+            else => unreachable,
+        }
+    }
+
+    pub fn getTypeFromIndex(index: usize) type {
+        switch (index) {
+            0 => return DialogueComponent,
+            1 => return TransformComponent,
             else => unreachable,
         }
     }
@@ -91,9 +114,12 @@ test "entity component test" {
                     has_test_entity_deinit = true;
                 }
             }.deinit,
-        }
+        },
+        // .components = .{ @as(*anyopaque, @constCast(@ptrCast(&DialogueComponent{ .text = "Test" }))), @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
+        .components = .{ null, @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
     };
     var test_entity = try ec_context.initEntity(&test_entity_template);
+    try std.testing.expect(test_entity.hasComponent(TransformComponent));
     var dialogue_comp = DialogueComponent{ .text = "Test speech!" };
     try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
     try test_entity.setComponent(DialogueComponent, &dialogue_comp);

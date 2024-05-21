@@ -41,13 +41,15 @@ pub fn EntityT(comptime IdType: type, comptime ComponentInterface: anytype, tag_
     return struct {
         const EntityTRef = @This();
 
-        const Interface = struct {
+        pub const Id = IdType;
+
+        pub const Interface = struct {
             init: ?*const fn(self: *EntityTRef) void = null,
             deinit: ?*const fn(self: *EntityTRef) void = null,
             update: ?*const fn(self: *EntityTRef) void = null,
         };
 
-        id: ?IdType = null,
+        id: ?Id = null,
         tag_list: ?TagList(tag_max) = null,
         allocator: std.mem.Allocator = undefined,
 
@@ -100,6 +102,12 @@ pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, co
             new_entity.* = entity_template.*;
             new_entity.allocator = self.allocator;
             new_entity.id = self.id_counter;
+            // Setup components
+            inline for (entity_template.components, 0..entity_template.components.len) |component_optional, i| {
+                if (component_optional) |component| {
+                    try ComponentInterface.setComponentByIndex(new_entity, self.allocator, i, component);
+                }
+            }
             self.id_counter += 1;
             if (new_entity.interface.init) |entity_init| {
                 entity_init(new_entity);
@@ -107,7 +115,7 @@ pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, co
             return new_entity;
         }
 
-        pub fn deinitEntity(self: *@This(), id: IdType) void {
+        pub fn deinitEntity(self: *@This(), id: Entity.Id) void {
             if (self.getEntity(id)) |entity| {
                 if (entity.interface.deinit) |entity_deinit| {
                     entity_deinit(entity);
@@ -123,7 +131,7 @@ pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, co
             }
         }
 
-        pub fn getEntity(self: *@This(), id: IdType) ?*Entity {
+        pub fn getEntity(self: *@This(), id: Entity.Id) ?*Entity {
             for (self.entities.items) |*entity| {
                 if (id == entity.id.?) {
                     return entity;

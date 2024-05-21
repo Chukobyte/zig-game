@@ -36,19 +36,37 @@ const TextLabelComponent = struct {
     text_label: TextLabel,
 };
 
+const ECContext = ec.ECContext(u32, ComponentInterface, &.{ TransformComponent, SpriteComponent, TextLabelComponent });
+
 const ComponentInterface = struct {
     const ECEntity = ec.EntityT(u32, @This(), 4, 3);
 
-    pub fn setComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type, component: *T) !void {
+    pub fn setComponent(entity: *ECContext.Entity, allocator: std.mem.Allocator, comptime T: type, component: *T) !void {
         const comp_index: usize = getTypeIndex(T);
         if (!hasComponent(entity, T)) {
             const new_comp: *T = try allocator.create(T);
-            new_comp.* = component.*;
             entity.components[comp_index] = new_comp;
+        }
+        entity.components[comp_index].* = component.*;
+    }
+
+    pub fn setComponentByIndex(entity: *ECContext.Entity, allocator: std.mem.Allocator, index: comptime_int, component: *anyopaque) !void {
+        const T: type = switch (index) {
+            0 => return TransformComponent,
+            1 => return SpriteComponent,
+            2 => return TextLabelComponent,
+            else => unreachable,
+        };
+
+        if (entity.components[index] == null) {
+            const new_comp: *T = try allocator.create(T);
+            const comp_ptr: *T = @alignCast(@ptrCast(component));
+            new_comp.* = comp_ptr.*;
+            entity.components[index] = new_comp;
         }
     }
 
-    pub fn getComponent(entity: *ECEntity, comptime T: type) ?*T {
+    pub fn getComponent(entity: *ECContext.Entity, comptime T: type) ?*T {
         const comp_index: usize = getTypeIndex(T);
         if (entity.components[comp_index]) |comp| {
             return @alignCast(@ptrCast(comp));
@@ -56,7 +74,7 @@ const ComponentInterface = struct {
         return null;
     }
 
-    pub fn removeComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type) void {
+    pub fn removeComponent(entity: *ECContext.Entity, allocator: std.mem.Allocator, comptime T: type) void {
         if (hasComponent(entity, T)) {
             const comp_index: usize = getTypeIndex(T);
             const comp_ptr: *T = @alignCast(@ptrCast(entity.components[comp_index]));
@@ -65,16 +83,25 @@ const ComponentInterface = struct {
         }
     }
 
-    pub fn hasComponent(entity: *ECEntity, comptime T: type) bool {
+    pub fn hasComponent(entity: *ECContext.Entity, comptime T: type) bool {
         const comp_index: usize = getTypeIndex(T);
         return entity.components[comp_index] != null;
     }
 
-    fn getTypeIndex(comptime T: type) usize {
+    pub fn getTypeIndex(comptime T: type) usize {
         switch (T) {
             TransformComponent => return 0,
             SpriteComponent => return 1,
             TextLabelComponent => return 2,
+            else => unreachable,
+        }
+    }
+
+    pub fn getTypeFromIndex(index: usize) type {
+        switch (index) {
+            0 => return TransformComponent,
+            1 => return SpriteComponent,
+            2 => return TextLabelComponent,
             else => unreachable,
         }
     }
@@ -102,7 +129,6 @@ pub fn deinit() void {
 }
 
 pub fn run() !void {
-    const ECContext = ec.ECContext(u32, ComponentInterface, &.{ TransformComponent, SpriteComponent, TextLabelComponent });
     var ec_context = ECContext.init(std.heap.page_allocator);
     defer ec_context.deinit();
 
