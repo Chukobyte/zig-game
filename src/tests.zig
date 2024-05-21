@@ -24,79 +24,19 @@ const TransformComponent = struct {
     transform: math.Transform2D,
 };
 
-const ComponentInterface = struct {
-    const ECEntity = ec.EntityT(u32, @This(), 4, 2);
-
-    pub fn setComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type, component: *T) !void {
-        const comp_index: usize = getTypeIndex(T);
-        if (!hasComponent(entity, T)) {
-            const new_comp: *T = try allocator.create(T);
-            new_comp.* = component.*;
-            entity.components[comp_index] = new_comp;
-        }
-    }
-
-    pub fn setComponentByIndex(entity: *ECEntity, allocator: std.mem.Allocator, index: comptime_int, component: *anyopaque) !void {
-        const T: type = switch (index) {
-            0 => DialogueComponent,
-            1 => TransformComponent,
-            else => unreachable,
-        };
-
-        if (entity.components[index] == null) {
-            const new_comp: *T = try allocator.create(T);
-            const comp_ptr: *T = @alignCast(@ptrCast(component));
-            new_comp.* = comp_ptr.*;
-            entity.components[index] = new_comp;
-        }
-    }
-
-    pub fn getComponent(entity: *ECEntity, comptime T: type) ?*T {
-        const comp_index: usize = getTypeIndex(T);
-        if (entity.components[comp_index]) |comp| {
-            return @alignCast(@ptrCast(comp));
-        }
-        return null;
-    }
-
-    pub fn removeComponent(entity: *ECEntity, allocator: std.mem.Allocator, comptime T: type) void {
-        if (hasComponent(entity, T)) {
-            const comp_index: usize = getTypeIndex(T);
-            const comp_ptr: *T = @alignCast(@ptrCast(entity.components[comp_index]));
-            allocator.destroy(comp_ptr);
-            entity.components[comp_index] = null;
-        }
-    }
-
-    pub fn hasComponent(entity: *ECEntity, comptime T: type) bool {
-        const comp_index: usize = getTypeIndex(T);
-        return entity.components[comp_index] != null;
-    }
-
-    pub fn getTypeIndex(comptime T: type) usize {
-        switch (T) {
-            DialogueComponent => return 0,
-            TransformComponent => return 1,
-            else => unreachable,
-        }
-    }
-
-    pub fn getTypeFromIndex(index: usize) type {
-        switch (index) {
-            0 => return DialogueComponent,
-            1 => return TransformComponent,
-            else => unreachable,
-        }
-    }
-};
-
 var has_test_entity_init = false;
 var has_test_entity_deinit = false;
 
 test "entity component test" {
+    const TestTypeList = ec.TypeList(&.{ DialogueComponent, TransformComponent });
+    try std.testing.expectEqual(0, TestTypeList.getIndex(DialogueComponent));
+    try std.testing.expectEqual(1, TestTypeList.getIndex(TransformComponent));
+    try std.testing.expectEqual(DialogueComponent, TestTypeList.getType(0));
+    try std.testing.expectEqual(TransformComponent, TestTypeList.getType(1));
+
     const allocator = std.testing.allocator;
 
-    const TestECContext = ec.ECContext(u32, ComponentInterface, &.{ DialogueComponent, TransformComponent });
+    const TestECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });
     var ec_context = TestECContext.init(allocator);
     defer ec_context.deinit();
 

@@ -36,10 +36,31 @@ pub fn TagList(max_tags: comptime_int) type {
     };
 }
 
-pub fn EntityT(comptime IdType: type, comptime ComponentInterface: anytype, tag_max: comptime_int, component_max: comptime_int) type {
+pub fn TypeList(comptime types: []const type) type {
+    return struct {
+        pub fn getType(index: comptime_int) type {
+            if (index < 0 or index >= types.len) {
+                @compileError("Passed in index is out of range");
+            }
+            return types[index];
+        }
+
+        pub fn getIndex(comptime T: type) usize {
+            inline for (types, 0..types.len) |t, i| {
+                if (t == T) {
+                    return i;
+                }
+            }
+            @compileError("No index found for type!");
+        }
+    };
+}
+
+pub fn EntityT(comptime IdType: type, comptime component_types: []const type, tag_max: comptime_int) type {
 
     return struct {
         const EntityTRef = @This();
+        const ComponentTypeList = TypeList(component_types);
 
         pub const Id = IdType;
 
@@ -53,33 +74,58 @@ pub fn EntityT(comptime IdType: type, comptime ComponentInterface: anytype, tag_
         tag_list: ?TagList(tag_max) = null,
         allocator: std.mem.Allocator = undefined,
 
-        components: [component_max]?*anyopaque = undefined,
+        components: [component_types.len]?*anyopaque = undefined,
         interface: Interface = .{},
 
-        pub inline fn setComponent(self: *@This(), comptime T: type, component: *T) !void {
-            try ComponentInterface.setComponent(self, self.allocator, T, component);
+        pub fn setComponent(self: *@This(), comptime T: type, component: *T) !void {
+            const comp_index: usize = ComponentTypeList.getIndex(T);
+            if (!hasComponent(self, T)) {
+                const new_comp: *T = try self.allocator.create(T);
+                new_comp.* = component.*;
+                self.components[comp_index] = new_comp;
+            }
+            // TODO: Set when has a component
         }
 
-        pub inline fn getComponent(self: *@This(), comptime T: type) ?*T {
-            return ComponentInterface.getComponent(self, T);
+        pub fn setComponentByIndex(self: *@This(), index: comptime_int, component: *anyopaque) !void {
+            if (self.components[index] == null) {
+                const T: type = ComponentTypeList.getType(index);
+                const new_comp: *T = try self.allocator.create(T);
+                const comp_ptr: *T = @alignCast(@ptrCast(component));
+                new_comp.* = comp_ptr.*;
+                self.components[index] = new_comp;
+            }
+            // TODO: Set when has a component
         }
 
-        pub inline fn removeComponent(self: *@This(), comptime T: type) void {
-            ComponentInterface.removeComponent(self, self.allocator, T);
+        pub fn getComponent(self: *@This(), comptime T: type) ?*T {
+            const comp_index: usize = ComponentTypeList.getIndex(T);
+            if (self.components[comp_index]) |comp| {
+                return @alignCast(@ptrCast(comp));
+            }
+            return null;
         }
 
-        pub inline fn hasComponent(self: *@This(), comptime T: type) bool {
-            return ComponentInterface.hasComponent(self, T);
+        pub fn removeComponent(self: *@This(), comptime T: type) void {
+            if (hasComponent(self, T)) {
+                const comp_index: usize = ComponentTypeList.getIndex(T);
+                const comp_ptr: *T = @alignCast(@ptrCast(self.components[comp_index]));
+                self.allocator.destroy(comp_ptr);
+                self.components[comp_index] = null;
+            }
+        }
+
+        pub fn hasComponent(self: *@This(), comptime T: type) bool {
+            const comp_index: usize = ComponentTypeList.getIndex(T);
+            return self.components[comp_index] != null;
         }
     };
 }
 
 
-pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, comptime component_types: []const type) type {
+pub fn ECContext(comptime IdType: type, comptime component_types: []const type) type {
     return struct {
-        pub const total_components: comptime_int = component_types.len;
-
-        pub const Entity = EntityT(IdType, ComponentInterface, 4, total_components);
+        pub const Entity = EntityT(IdType, component_types, 4);
 
         allocator: std.mem.Allocator,
         entities: std.ArrayList(Entity),
@@ -105,7 +151,7 @@ pub fn ECContext(comptime IdType: type, comptime ComponentInterface: anytype, co
             // Setup components
             inline for (entity_template.components, 0..entity_template.components.len) |component_optional, i| {
                 if (component_optional) |component| {
-                    try ComponentInterface.setComponentByIndex(new_entity, self.allocator, i, component);
+                    try new_entity.setComponentByIndex(i, component);
                 }
             }
             self.id_counter += 1;
