@@ -26,6 +26,7 @@ const TransformComponent = struct {
 
 var has_test_entity_init = false;
 var has_test_entity_deinit = false;
+var has_test_entity_updated = false;
 
 test "type list test" {
     const TestTypeList = ec.TypeList(&.{ DialogueComponent, TransformComponent });
@@ -36,10 +37,8 @@ test "type list test" {
 }
 
 test "entity component test" {
-    const allocator = std.testing.allocator;
-
     const TestECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });
-    var ec_context = TestECContext.init(allocator);
+    var ec_context = TestECContext.init(std.testing.allocator);
     defer ec_context.deinit();
 
     const test_entity_template = TestECContext.Entity{
@@ -56,6 +55,12 @@ test "entity component test" {
                     has_test_entity_deinit = true;
                 }
             }.deinit,
+            .update = struct {
+                pub fn update(self: *TestECContext.Entity) void {
+                    _ = self;
+                    has_test_entity_updated = true;
+                }
+            }.update,
         },
         // .components = .{ @as(*anyopaque, @constCast(@ptrCast(&DialogueComponent{ .text = "Test" }))), @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
         .components = .{ null, @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
@@ -74,10 +79,13 @@ test "entity component test" {
     test_entity.removeComponent(DialogueComponent);
     try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
 
+    ec_context.updateEntities();
+
     ec_context.deinitEntity(test_entity.id.?);
 
     try std.testing.expect(has_test_entity_init);
     try std.testing.expect(has_test_entity_deinit);
+    try std.testing.expect(has_test_entity_updated);
 }
 
 test "world test" {
