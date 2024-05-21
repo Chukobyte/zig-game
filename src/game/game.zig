@@ -4,9 +4,10 @@ const zeika = @import("zeika");
 const math = zeika.math;
 
 const assets = @import("assets");
+const engine = @import("engine");
 
-const core = @import("core.zig");
-const ec = @import("../engine/entity_component/entity_component.zig");
+const core = engine.core;
+const ec = engine.ec;
 
 const Renderer = zeika.Renderer;
 const Texture = zeika.Texture;
@@ -16,30 +17,22 @@ const Vec2i = zeika.math.Vec2i;
 const Rect2 = zeika.math.Rect2;
 const Color = zeika.math.Color;
 
-const World = core.World;
-const Entity = core.Entity;
 const Sprite = core.Sprite;
 const TextLabel = core.TextLabel;
 const Collision = core.Collision;
 const Camera = core.Camera;
 const GameProperties = core.GameProperties;
 
-const TransformComponent = struct {
-    transform: math.Transform2D = math.Transform2D.Identity,
-};
+const comps = @import("components.zig");
+const TransformComponent = comps.TransformComponent;
+const SpriteComponent = comps.SpriteComponent;
+const TextLabelComponent = comps.TextLabelComponent;
+const ColliderComponent = comps.ColliderComponent;
 
-const SpriteComponent = struct {
-    sprite: Sprite,
-};
-
-const TextLabelComponent = struct {
-    text_label: TextLabel,
-};
-
-const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent });
+pub const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent });
 
 var game_properties = GameProperties{};
-var gloabal_world: World = undefined;
+var ec_context: ECContext = undefined;
 
 pub fn init(props: GameProperties) !void {
     game_properties = props;
@@ -50,18 +43,17 @@ pub fn init(props: GameProperties) !void {
         game_properties.resolution.x,
         game_properties.resolution.y
     );
-    gloabal_world = World.init(std.heap.page_allocator);
-
 }
 
 pub fn deinit() void {
-    gloabal_world.deinit();
     zeika.shutdownAll();
 }
 
 pub fn run() !void {
-    var ec_context = ECContext.init(std.heap.page_allocator);
+    ec_context = ECContext.init(std.heap.page_allocator);
     defer ec_context.deinit();
+    const Entity = ECContext.Entity;
+    const Tags = ECContext.Tags;
 
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
@@ -73,84 +65,82 @@ pub fn run() !void {
     );
     defer default_font.deinit();
 
-    const sprite_interface = Entity.Interface{
-        .update = struct {
-            pub fn update(self: *Entity) void {
-                if (self.sprite) |*sprite| {
-                    if (self.collision) |*collision| {
-                        const world_mouse_pos: Vec2 = getWorldMousePos();
-                        const entity_collider = Rect2{
-                            .x = self.transform.position.x + collision.collider.x,
-                            .y = self.transform.position.y + collision.collider.y,
-                            .w = collision.collider.w,
-                            .h = collision.collider.h
-                        };
-                        const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
-                        if (entity_collider.doesOverlap(&mouse_collider)) {
-                            if (zeika.isKeyPressed(.mouse_button_left, 0)) {
-                                sprite.modulate = Color.White;
-                            } else {
-                                sprite.modulate = Color.Red;
-                            }
-
-                            if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
-                                if (gloabal_world.getEntityByTag("text_label")) |text_label_entity| {
-                                    if (text_label_entity.text_label) |*text_label| {
-                                        const StaticData = struct {
-                                            var text_buffer: [256]u8 = undefined;
-                                            var money: i32 = 0;
-                                        };
-                                        StaticData.money += 1;
-                                        text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+    _ = try ec_context.initEntity(&.{
+        .tag_list = Tags.initFromSlice(&.{ "sprite" }),
+        .components = .{
+            ec.constCompCast(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } }),
+            ec.constCompCast(SpriteComponent, &.{ .sprite = .{ .texture = texture_handle, .size = .{ .x = 64.0, .y = 64.0 }, .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 }, .modulate = Color.Blue } }),
+            null,
+            ec.constCompCast(ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } }),
+        },
+        .interface = .{
+            .update = struct {
+                pub fn update(self: *Entity) void {
+                    if (self.getComponent(TransformComponent)) |trans_comp| {
+                        if (self.getComponent(SpriteComponent)) |sprite_comp| {
+                            if (self.getComponent(ColliderComponent)) |collider_comp| {
+                                const transform = trans_comp.transform;
+                                var sprite = &sprite_comp.sprite;
+                                const collider = collider_comp.collider;
+                                const world_mouse_pos: Vec2 = getWorldMousePos();
+                                const entity_collider = Rect2{
+                                    .x = transform.position.x + collider.x,
+                                    .y = transform.position.y + collider.y,
+                                    .w = collider.w,
+                                    .h = collider.h
+                                };
+                                const mouse_collider = Rect2{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
+                                if (entity_collider.doesOverlap(&mouse_collider)) {
+                                    if (zeika.isKeyPressed(.mouse_button_left, 0)) {
+                                        sprite.modulate = Color.White;
+                                    } else {
+                                        sprite.modulate = Color.Red;
                                     }
+
+                                    if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
+                                        if (ec_context.getEntityByTag("text_label")) |text_label_entity| {
+                                            if (text_label_entity.getComponent(TextLabelComponent)) |text_label_comp| {
+                                                const StaticData = struct {
+                                                    var text_buffer: [256]u8 = undefined;
+                                                    var money: i32 = 0;
+                                                };
+                                                StaticData.money += 1;
+                                                text_label_comp.text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    sprite.modulate = Color.Blue;
                                 }
                             }
-                        } else {
-                            sprite.modulate = Color.Blue;
                         }
                     }
                 }
-            }
-        }.update,
-    };
+            }.update
+        },
+    });
 
-    const text_label_interface = Entity.Interface{
-        .on_enter_scene = struct {
-            pub fn on_enter_scene(self: *Entity) void  {
-                const StaticData = struct {
-                    var text_buffer: [256]u8 = undefined;
-                };
-                if (self.text_label) |*text_label| {
-                    text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
+    _ = try ec_context.initEntity(&.{
+        .tag_list = Tags.initFromSlice(&.{ "text_label" }),
+        .components = .{
+            ec.constCompCast(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } }),
+            null,
+            ec.constCompCast(TextLabelComponent, &.{ .text_label = .{ .font = default_font, .color = Color.Red } }),
+            null
+        },
+        .interface = .{
+            .init = struct {
+                pub fn init(self: *Entity) void  {
+                    const StaticData = struct {
+                        var text_buffer: [256]u8 = undefined;
+                    };
+                    if (self.getComponent(TextLabelComponent)) |text_label_comp| {
+                        text_label_comp.text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
+                    }
                 }
-            }
-        }.on_enter_scene,
-    };
-
-    const entities = [_]Entity{
-        Entity{
-            .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } },
-            .tag_list = Entity.Tags.initFromSlice(&.{ "sprite" }),
-            .sprite = Sprite{
-                .texture = texture_handle,
-                .size = .{ .x = 64.0, .y = 64.0 },
-                .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                .modulate = Color.Blue,
-            },
-            .collision = Collision{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } },
-            .interface = sprite_interface,
+            }.init
         },
-        Entity{
-            .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } },
-            .tag_list = Entity.Tags.initFromSlice(&.{ "text_label" }),
-            .text_label = .{
-                .font = default_font,
-                .color = Color.Red
-            },
-            .interface = text_label_interface,
-        },
-    };
-    _ = try gloabal_world.registerEntities(&entities);
+    });
 
     while (zeika.isRunning()) {
         zeika.update();
@@ -159,24 +149,10 @@ pub fn run() !void {
             break;
         }
 
-        // TODO: Prototyping things, eventually will categorize game objects so we don't have conditionals within the update loops
+        ec_context.updateEntities();
 
-        // Object Updates
-        for (gloabal_world.entities.items) |*entity| {
-            if (entity.interface.update) |update| {
-                update(entity);
-            }
-        }
+        ec_context.renderEntities();
 
-        // Render
-        for (gloabal_world.entities.items) |*entity| {
-            if (entity.*.getSpriteDrawConfig()) |draw_config| {
-                Renderer.queueDrawSprite(&draw_config);
-            }
-            if (entity.getTextDrawConfig()) |draw_config| {
-                Renderer.queueDrawText(&draw_config);
-            }
-        }
         Renderer.flushBatches();
     }
 }
