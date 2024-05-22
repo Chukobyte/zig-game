@@ -1,7 +1,6 @@
 const game = @import("game/game.zig");
 
 pub fn main() !void {
-    try game.init(.{});
+    try game.initAndRun(.{});
     defer game.deinit();
-    try game.run();
 }

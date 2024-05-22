@@ -8,6 +8,7 @@ const game = @import("game");
 const data_db = engine.data_db;
 const core = engine.core;
 const ec = engine.ec;
+const string = engine.string;
 
 const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
@@ -35,7 +36,7 @@ const DialogueComponent = struct {
     pub fn deinit(comp: *anyopaque, entity: *ECContext.Entity) void {
         _ = entity;
         const dial_comp: *@This() = @alignCast(@ptrCast(comp));
-        if (std.mem.eql(u8, "Test speech!", dial_comp.text)) {
+        if (std.mem.eql(u8, "New Message", dial_comp.text)) {
             dialogue_comp_deinit = true;
         }
     }
@@ -103,9 +104,13 @@ test "entity component test" {
 
     ec_context.updateEntities();
 
+    try test_entity.setComponent(DialogueComponent, &.{ .text = "New Message" });
+    if (test_entity.getComponent(DialogueComponent)) |found_comp| {
+        try std.testing.expectEqualStrings("New Message", found_comp.text);
+    }
+
     test_entity.removeComponent(DialogueComponent);
     try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
-
 
     ec_context.deinitEntity(test_entity);
 
@@ -215,4 +220,16 @@ test "object data db json test" {
     defer allocator.free(json_string);
     try std.testing.expectEqualStrings(json_to_parse,json_string);
     // std.debug.print("json_string = \n{s}\n", .{ json_string });
+}
+
+test "string test" {
+    const allocator = std.testing.allocator;
+    var test_string = string.String8.init(allocator);
+    defer test_string.deinit();
+    try test_string.set("StackOk", .{});
+    try std.testing.expectEqual(.stack, test_string.mode);
+    try std.testing.expectEqualStrings("StackOk", test_string.get());
+    try test_string.set("String on heap!", .{});
+    try std.testing.expectEqual(.heap, test_string.mode);
+    try std.testing.expectEqualStrings("String on heap!", test_string.buffer);
 }

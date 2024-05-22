@@ -70,144 +70,161 @@ pub inline fn constCompCast(comptime T: type, comp: *const T) *anyopaque {
     return @as(*anyopaque, @constCast(@ptrCast(comp)));
 }
 
-fn EntityT(comptime IdType: type, comptime component_types: []const type, tag_max: comptime_int) type {
+const ECContextErrors = error {
+    UnableToSet,
+};
 
-    return struct {
-        const EntityTRef = @This();
-        const ComponentTypeList = TypeList(component_types);
-
-        pub const Component = struct {
-            pub const Interface = struct {
-                init: ?*const fn(*anyopaque, *EntityTRef) void = null,
-                deinit: ?*const fn(*anyopaque, *EntityTRef) void = null,
-                update: ?*const fn(*anyopaque, *EntityTRef) void = null,
-                render: ?*const fn(*anyopaque, *EntityTRef) void = null,
-            };
-
-            pub const State = enum {
-                inactive,
-                active,
-            };
-
-            data: ?*anyopaque = null,
-            interface: Component.Interface = .{},
-            state: State = .inactive,
-
-            pub fn createInterface(comptime T: type) Component.Interface {
-                var interface: Component.Interface = .{};
-                if (@hasDecl(T, "init")) {
-                    interface.init = @field(T, "init");
-                }
-                if (@hasDecl(T, "deinit")) {
-                    interface.deinit = @field(T, "deinit");
-                }
-                if (@hasDecl(T, "update")) {
-                    interface.update = @field(T, "update");
-                }
-                if (@hasDecl(T, "render")) {
-                    interface.render = @field(T, "render");
-                }
-
-                return interface;
-            }
-        };
-
-        pub const Id = IdType;
-
-        pub const Interface = struct {
-            init: ?*const fn(self: *EntityTRef) void = null,
-            deinit: ?*const fn(self: *EntityTRef) void = null,
-            update: ?*const fn(self: *EntityTRef) void = null,
-        };
-
-        id: ?Id = null,
-        allocator: std.mem.Allocator = undefined,
-
-        tag_list: ?TagList(tag_max) = null,
-        interface: Interface = .{},
-        components: [component_types.len]Component = undefined,
-
-        pub fn updateComponents(self: *@This()) void {
-            for (&self.components) |*comp| {
-                if (comp.data) |comp_data| {
-                    if (comp.interface.update) |comp_update| {
-                        comp_update(comp_data, self);
-                    }
-                }
-            }
-        }
-
-        pub fn renderComponents(self: *@This()) void {
-            for (&self.components) |*comp| {
-                if (comp.data) |comp_data| {
-                    if (comp.interface.render) |render| {
-                        render(comp_data, self);
-                    }
-                }
-            }
-        }
-
-        pub fn setComponent(self: *@This(), comptime T: type, component: *const T) !void {
-            const comp_index: usize = ComponentTypeList.getIndex(T);
-            if (!hasComponent(self, T)) {
-                const new_comp: *T = try self.allocator.create(T);
-                new_comp.* = component.*;
-                self.components[comp_index].data = new_comp;
-                if (self.components[comp_index].interface.init) |comp_init| {
-                    comp_init(self.components[comp_index].data.?, self);
-                }
-            }
-            // TODO: Set when has a component
-        }
-
-        pub fn setComponentByIndex(self: *@This(), index: comptime_int, component: *anyopaque) !void {
-            if (self.components[index].data == null) {
-                const T: type = ComponentTypeList.getType(index);
-                const new_comp: *T = try self.allocator.create(T);
-                const comp_ptr: *T = ptrCompCast(T, component);
-                new_comp.* = comp_ptr.*;
-                self.components[index].data = new_comp;
-                if (self.components[index].interface.init) |comp_init| {
-                    comp_init(self.components[index].data.?, self);
-                }
-            }
-            // TODO: Set when has a component
-        }
-
-        pub fn getComponent(self: *@This(), comptime T: type) ?*T {
-            const comp_index: usize = ComponentTypeList.getIndex(T);
-            if (self.components[comp_index].data) |comp| {
-                return ptrCompCast(T, comp);
-            }
-            return null;
-        }
-
-        pub fn removeComponent(self: *@This(), comptime T: type) void {
-            if (hasComponent(self, T)) {
-                const comp_index: usize = ComponentTypeList.getIndex(T);
-                if (self.components[comp_index].interface.deinit) |comp_deinit| {
-                    comp_deinit(self.components[comp_index].data.?, self);
-                }
-                const comp_ptr: *T = ptrCompCast(T, self.components[comp_index].data.?);
-                self.allocator.destroy(comp_ptr);
-                self.components[comp_index].data = null;
-            }
-        }
-
-        pub fn hasComponent(self: *@This(), comptime T: type) bool {
-            const comp_index: usize = ComponentTypeList.getIndex(T);
-            return self.components[comp_index].data != null;
-        }
-    };
-}
-
-
+/// Context of entity component (system)
 pub fn ECContext(comptime IdType: type, comptime component_types: []const type) type {
-    const type_list = TypeList(component_types);
+    const ComponentTypeList = TypeList(component_types);
     const tag_max = 4;
+
     return struct {
+        const ECContextTRef = @This();
+
+        /// Entity with interface
+        pub const Entity = struct {
+            const EntityTRef = @This();
+            pub const Id = IdType;
+
+            /// Component with interface
+            pub const Component = struct {
+                pub const Interface = struct {
+                    init: ?*const fn(*anyopaque, *EntityTRef) void = null,
+                    deinit: ?*const fn(*anyopaque, *EntityTRef) void = null,
+                    update: ?*const fn(*anyopaque, *EntityTRef) void = null,
+                    render: ?*const fn(*anyopaque, *EntityTRef) void = null,
+                };
+
+                pub const State = enum {
+                    inactive,
+                    active,
+                };
+
+                data: ?*anyopaque = null,
+                interface: Component.Interface = .{},
+                state: State = .inactive,
+
+                pub fn createInterface(comptime T: type) Component.Interface {
+                    var interface: Component.Interface = .{};
+                    if (@hasDecl(T, "init")) {
+                        interface.init = @field(T, "init");
+                    }
+                    if (@hasDecl(T, "deinit")) {
+                        interface.deinit = @field(T, "deinit");
+                    }
+                    if (@hasDecl(T, "update")) {
+                        interface.update = @field(T, "update");
+                    }
+                    if (@hasDecl(T, "render")) {
+                        interface.render = @field(T, "render");
+                    }
+
+                    return interface;
+                }
+            };
+
+            pub const Interface = struct {
+                init: ?*const fn(self: *EntityTRef) void = null,
+                deinit: ?*const fn(self: *EntityTRef) void = null,
+                update: ?*const fn(self: *EntityTRef) void = null,
+            };
+
+            ec_context: *ECContextTRef,
+            id: ?IdType = null,
+            allocator: std.mem.Allocator = undefined,
+
+            tag_list: ?TagList(tag_max) = null,
+            interface: Interface = .{},
+            components: [component_types.len]Component = undefined,
+
+            pub fn updateComponents(self: *@This()) void {
+                for (&self.components) |*comp| {
+                    if (comp.data) |comp_data| {
+                        if (comp.interface.update) |comp_update| {
+                            comp_update(comp_data, self);
+                        }
+                    }
+                }
+            }
+
+            pub fn renderComponents(self: *@This()) void {
+                for (&self.components) |*comp| {
+                    if (comp.data) |comp_data| {
+                        if (comp.interface.render) |render| {
+                            render(comp_data, self);
+                        }
+                    }
+                }
+            }
+
+            pub fn setComponent(self: *@This(), comptime T: type, component: *const T) std.mem.Allocator.Error!void {
+                const comp_index: usize = ComponentTypeList.getIndex(T);
+                if (!hasComponent(self, T)) {
+                    const new_comp: *T = try self.allocator.create(T);
+                    new_comp.* = component.*;
+                    self.components[comp_index].data = new_comp;
+                    if (self.components[comp_index].interface.init) |comp_init| {
+                        comp_init(self.components[comp_index].data.?, self);
+                    }
+                } else {
+                    try self.copyComponent(T, component);
+                }
+            }
+
+            pub fn setComponentByIndex(self: *@This(), index: comptime_int, component: *anyopaque) !void {
+                const T: type = ComponentTypeList.getType(index);
+                const comp_ptr: *T = ptrCompCast(T, component);
+                if (self.components[index].data == null) {
+                    const new_comp: *T = try self.allocator.create(T);
+                    new_comp.* = comp_ptr.*;
+                    self.components[index].data = new_comp;
+                    if (self.components[index].interface.init) |comp_init| {
+                        comp_init(self.components[index].data.?, self);
+                    }
+                } else {
+                    try self.copyComponent(T, comp_ptr);
+                }
+            }
+
+            pub fn getComponent(self: *@This(), comptime T: type) ?*T {
+                const comp_index: usize = ComponentTypeList.getIndex(T);
+                if (self.components[comp_index].data) |comp| {
+                    return ptrCompCast(T, comp);
+                }
+                return null;
+            }
+
+            pub fn removeComponent(self: *@This(), comptime T: type) void {
+                if (hasComponent(self, T)) {
+                    const comp_index: usize = ComponentTypeList.getIndex(T);
+                    if (self.components[comp_index].interface.deinit) |comp_deinit| {
+                        comp_deinit(self.components[comp_index].data.?, self);
+                    }
+                    const comp_ptr: *T = ptrCompCast(T, self.components[comp_index].data.?);
+                    self.allocator.destroy(comp_ptr);
+                    self.components[comp_index].data = null;
+                }
+            }
+
+            pub inline fn hasComponent(self: *@This(), comptime T: type) bool {
+                const comp_index: usize = ComponentTypeList.getIndex(T);
+                return self.components[comp_index].data != null;
+            }
+
+            fn copyComponent(self: *@This(), comptime T: type, component: *const T) std.mem.Allocator.Error!void {
+                if (self.hasComponent(T)) {
+                    const comp_index: usize = ComponentTypeList.getIndex(T);
+                    const dest_comp: *T = ptrCompCast(T, self.components[comp_index].data.?);
+                    dest_comp.* = component.*;
+                } else {
+                    try self.setComponent(T, component);
+                }
+            }
+        };
+
+
         pub const Tags = TagList(tag_max);
-        pub const Entity = EntityT(IdType, component_types, tag_max);
 
         pub const EntityTemplate = struct {
             tag_list: ?Tags = null,
@@ -234,12 +251,13 @@ pub fn ECContext(comptime IdType: type, comptime component_types: []const type) 
         pub fn initEntity(self: *@This(), entity_template: *const EntityTemplate) !*Entity {
             const new_entity: *Entity = try self.entities.addOne();
             new_entity.allocator = self.allocator;
+            new_entity.ec_context = self;
             new_entity.id = self.id_counter;
             new_entity.tag_list = entity_template.tag_list;
             new_entity.interface = entity_template.interface;
             // Setup components
             inline for (entity_template.components, 0..component_types.len) |component_optional, i| {
-                const CompT = type_list.getType(i);
+                const CompT = ComponentTypeList.getType(i);
                 new_entity.components[i] = Entity.Component{ .interface = Entity.Component.createInterface(CompT) };
                 if (component_optional) |component| {
                     try new_entity.setComponentByIndex(i, component);
