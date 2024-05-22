@@ -29,12 +29,12 @@ pub const TransformComponent = struct {
 pub const SpriteComponent = struct {
     sprite: Sprite,
 
-    pub fn render_sprite(comp: *anyopaque, entity: *ECContext.Entity) Renderer.SpriteDrawQueueConfig {
+    pub fn render(comp: *anyopaque, entity: *ECContext.Entity) void {
         const sprite_comp: *@This() = @alignCast(@ptrCast(comp));
         if (entity.getComponent(TransformComponent)) |transform_comp| {
-            return sprite_comp.sprite.getDrawConfig(&transform_comp.transform, 0);
+            const draw_config = sprite_comp.sprite.getDrawConfig(&transform_comp.transform, 0);
+            Renderer.queueDrawSprite(&draw_config);
         }
-        unreachable;
     }
 };
 
@@ -50,12 +50,12 @@ pub const TextLabelComponent = struct {
         text_label_comp.text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
     }
 
-    pub fn render_text(comp: *anyopaque, entity: *ECContext.Entity) Renderer.TextDrawQueueConfig {
+    pub fn render(comp: *anyopaque, entity: *ECContext.Entity) void {
         const text_label_comp: *@This() = @alignCast(@ptrCast(comp));
         if (entity.getComponent(TransformComponent)) |transform_comp|  {
-            return text_label_comp.text_label.getDrawConfig(transform_comp.transform.position, 0);
+            const draw_config = text_label_comp.text_label.getDrawConfig(transform_comp.transform.position, 0);
+            Renderer.queueDrawText(&draw_config);
         }
-        unreachable;
     }
 };
 

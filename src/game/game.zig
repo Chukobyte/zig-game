@@ -29,10 +29,10 @@ const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const ColliderComponent = comps.ColliderComponent;
 
-pub const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent });
-
 var game_properties = GameProperties{};
-var ec_context: ECContext = undefined;
+
+pub const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent });
+pub var ec_context: ECContext = undefined;
 
 pub fn init(props: GameProperties) !void {
     game_properties = props;

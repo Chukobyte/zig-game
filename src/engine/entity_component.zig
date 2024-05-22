@@ -81,8 +81,7 @@ fn EntityT(comptime IdType: type, comptime component_types: []const type, tag_ma
                 init: ?*const fn(*anyopaque, *EntityTRef) void = null,
                 deinit: ?*const fn(*anyopaque, *EntityTRef) void = null,
                 update: ?*const fn(*anyopaque, *EntityTRef) void = null,
-                render_sprite: ?*const fn(*anyopaque, *EntityTRef) Renderer.SpriteDrawQueueConfig = null,
-                render_text: ?*const fn(*anyopaque, *EntityTRef) Renderer.TextDrawQueueConfig = null,
+                render: ?*const fn(*anyopaque, *EntityTRef) void = null,
             };
 
             pub const State = enum {
@@ -105,11 +104,8 @@ fn EntityT(comptime IdType: type, comptime component_types: []const type, tag_ma
                 if (@hasDecl(T, "update")) {
                     interface.update = @field(T, "update");
                 }
-                if (@hasDecl(T, "render_sprite")) {
-                    interface.render_sprite = @field(T, "render_sprite");
-                }
-                if (@hasDecl(T, "render_text")) {
-                    interface.render_text = @field(T, "render_text");
+                if (@hasDecl(T, "render")) {
+                    interface.render = @field(T, "render");
                 }
 
                 return interface;
@@ -144,11 +140,8 @@ fn EntityT(comptime IdType: type, comptime component_types: []const type, tag_ma
         pub fn renderComponents(self: *@This()) void {
             for (&self.components) |*comp| {
                 if (comp.data) |comp_data| {
-                    if (comp.interface.render_sprite) |render_sprite| {
-                        Renderer.queueDrawSprite(&render_sprite(comp_data, self));
-                    }
-                    if (comp.interface.render_text) |render_text| {
-                        Renderer.queueDrawText(&render_text(comp_data, self));
+                    if (comp.interface.render) |render| {
+                        render(comp_data, self);
                     }
                 }
             }
