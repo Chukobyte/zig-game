@@ -146,8 +146,7 @@ fn TypeBitMask(comptime types: []const type) type {
     };
 }
 
-
-/// The ecs context used to manage entities, components, and systems
+/// Paramaters to initialize ecs context
 pub const ECSContextParams = struct {
     entity_type: type = usize,
     entity_interfaces: []const type = &.{},
@@ -155,6 +154,7 @@ pub const ECSContextParams = struct {
     systems: []const type = &.{},
 };
 
+/// The ecs context used to manage entities, components, and systems
 pub fn ECSContext(context_params: ECSContextParams) type {
     const max_tags = 4;
     const EntityIdType = context_params.entity_type;
@@ -179,11 +179,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             is_valid: bool = false,
         };
 
+        /// System related stuff
         pub const ECSystemData = struct {
             interface_instance: *anyopaque,
             component_signature: TypeBitMask(component_types) = .{},
         };
 
+        /// Optional parameters for creating an entity
         pub const InitEntityParams = struct {
             interface_type: ?type = null,
         };
