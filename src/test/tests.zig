@@ -100,14 +100,15 @@ test "entity component test" {
 
     if (test_entity.getComponent(DialogueComponent)) |found_comp| {
         try std.testing.expectEqualStrings("Test speech!", found_comp.text);
+    } else {
+        try std.testing.expect(false);
     }
 
     ec_context.updateEntities();
 
     try test_entity.setComponent(DialogueComponent, &.{ .text = "New Message" });
-    if (test_entity.getComponent(DialogueComponent)) |found_comp| {
-        try std.testing.expectEqualStrings("New Message", found_comp.text);
-    }
+    const found_dialogue_comp = test_entity.getComponentChecked(DialogueComponent);
+    try std.testing.expectEqualStrings("New Message", found_dialogue_comp.text);
 
     test_entity.removeComponent(DialogueComponent);
     try std.testing.expect(!test_entity.hasComponent(DialogueComponent));

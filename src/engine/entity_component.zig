@@ -195,6 +195,14 @@ pub fn ECContext(comptime IdType: type, comptime component_types: []const type) 
                 return null;
             }
 
+            pub fn getComponentChecked(self: *@This(), comptime T: type) *T {
+                const comp_index: usize = ComponentTypeList.getIndex(T);
+                if (self.components[comp_index].data) |comp| {
+                    return ptrCompCast(T, comp);
+                }
+                unreachable;
+            }
+
             pub fn removeComponent(self: *@This(), comptime T: type) void {
                 if (hasComponent(self, T)) {
                     const comp_index: usize = ComponentTypeList.getIndex(T);
