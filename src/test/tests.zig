@@ -8,6 +8,7 @@ const game = @import("game");
 const data_db = engine.data_db;
 const core = engine.core;
 const ec = engine.ec;
+const ecs = engine.ecs;
 const string = engine.string;
 
 const ObjectsList = data_db.ObjectsList;
@@ -54,12 +55,96 @@ const TransformComponent = struct {
     transform: math.Transform2D,
 };
 
+const TestEntityInterface = struct {
+    var has_called_init = false;
+    var has_called_deinit = false;
+    var has_called_tick = false;
+
+    pub fn init(self: *TestEntityInterface) void {
+        _ = self;
+        has_called_init = true;
+    }
+    pub fn deinit(self: *TestEntityInterface) void {
+        _ = self;
+        has_called_deinit = true;
+    }
+    pub fn tick(self: *TestEntityInterface) void {
+        _ = self;
+        has_called_tick = true;
+    }
+};
+
+const TestECSystem = struct {
+    var has_called_init = false;
+    var has_called_deinit = false;
+    var has_called_pre_context_tick = false;
+    var has_called_post_context_tick = false;
+
+    pub fn init(self: *TestECSystem) void {
+        _ = self;
+        has_called_init = true;
+    }
+    pub fn deinit(self: *TestECSystem) void {
+        _ = self;
+        has_called_deinit = true;
+    }
+    pub fn preContextTick(self: *TestECSystem) void {
+        _ = self;
+        has_called_pre_context_tick = true;
+    }
+    pub fn postContextTick(self: *TestECSystem) void {
+        _ = self;
+        has_called_post_context_tick = true;
+    }
+};
+
 test "type list test" {
     const TestTypeList = ec.TypeList(&.{ DialogueComponent, TransformComponent });
     try std.testing.expectEqual(0, TestTypeList.getIndex(DialogueComponent));
     try std.testing.expectEqual(1, TestTypeList.getIndex(TransformComponent));
     try std.testing.expectEqual(DialogueComponent, TestTypeList.getType(0));
     try std.testing.expectEqual(TransformComponent, TestTypeList.getType(1));
+}
+
+test "ecs test" {
+    const ECSContext = ecs.ECSContext(.{
+        .entity_type = usize,
+        .entity_interfaces = &.{ TestEntityInterface },
+        .components = &.{ DialogueComponent, TransformComponent },
+        .systems = &.{ TestECSystem },
+    });
+    const Entity = ECSContext.Entity;
+
+    var ecs_context = try ECSContext.init(std.testing.allocator);
+
+    try std.testing.expectEqual(false, ecs_context.isEntityValid(0));
+    const new_entity: Entity = try ecs_context.initEntity(.{ .interface_type = TestEntityInterface });
+    try std.testing.expectEqual(true, ecs_context.isEntityValid(0));
+
+    // Test component state
+    try std.testing.expectEqual(false, ecs_context.hasComponent(new_entity, DialogueComponent));
+    try std.testing.expectEqual(false, ecs_context.isComponentEnabled(new_entity, DialogueComponent));
+    try ecs_context.setComponent(new_entity, DialogueComponent, &.{ .text = "Testing things!" });
+    try std.testing.expectEqual(true, ecs_context.hasComponent(new_entity, DialogueComponent));
+    try std.testing.expectEqual(true, ecs_context.isComponentEnabled(new_entity, DialogueComponent));
+    ecs_context.setComponentEnabled(new_entity, DialogueComponent, false);
+    try std.testing.expectEqual(false, ecs_context.isComponentEnabled(new_entity, DialogueComponent));
+
+    // Test entity interface
+    try std.testing.expectEqual(0, new_entity);
+    try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
+    ecs_context.tick();
+    try std.testing.expectEqual(true, TestEntityInterface.has_called_tick);
+    ecs_context.deinitEntity(new_entity);
+    try std.testing.expectEqual(false, ecs_context.isEntityValid(new_entity));
+    try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);
+
+    // Test system interface
+    ecs_context.deinit();
+    try std.testing.expectEqual(true, TestECSystem.has_called_init);
+    try std.testing.expectEqual(true, TestECSystem.has_called_deinit);
+    try std.testing.expectEqual(true, TestECSystem.has_called_pre_context_tick);
+    try std.testing.expectEqual(true, TestECSystem.has_called_post_context_tick);
 }
 
 const ECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });
