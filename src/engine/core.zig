@@ -3,6 +3,8 @@ const std = @import("std");
 const zeika = @import("zeika");
 const assets = @import("assets");
 
+const string = @import("string.zig");
+
 const seika = zeika.seika;
 const math = zeika.math;
 
@@ -40,14 +42,20 @@ pub const Sprite = struct {
 };
 
 pub const TextLabel = struct {
+    pub const String = string.String128;
+
     font: Font,
-    text: []u8 = undefined,
+    text: String,
     color: Color = Color.White,
+
+    pub inline fn setText(self: *@This(), comptime fmt: []const u8, args: anytype) !void {
+        try self.text.set(fmt, args);
+    }
 
     pub fn getDrawConfig(self: *const @This(), position: Vec2, z_index: i32) Renderer.TextDrawQueueConfig {
         return .{
             .font = self.font,
-            .text = self.text,
+            .text = self.text.get(),
             .position = position,
             .color = self.color,
             .z_index = z_index,

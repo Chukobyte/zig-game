@@ -1,15 +1,16 @@
 const std = @import("std");
 
-pub fn DynamicString(stack_buffer_size: comptime_int) type {
+pub fn DynamicString(stack_buffer_size: comptime_int, comptime auto_free_heap: bool) type {
     return struct {
 
         const Mode = enum {
+            initial,
             stack,
             heap,
-            };
+        };
 
         allocator: std.mem.Allocator,
-        mode: Mode,
+        mode: Mode = .initial,
         stack_buffer: [stack_buffer_size]u8,
         heap_buffer: ?[]u8 = null,
         buffer: []u8,
@@ -48,6 +49,20 @@ pub fn DynamicString(stack_buffer_size: comptime_int) type {
             } else {
                 self.mode = .stack;
                 self.buffer = try std.fmt.bufPrint(&self.stack_buffer, fmt, args);
+                if (auto_free_heap) {
+                    self.freeHeap();
+                }
+            }
+        }
+
+        /// Will free heap if no longer being used
+        pub fn freeHeap(self: *@This()) void {
+            if (self.mode == .stack) {
+                return;
+            }
+            if (self.heap_buffer) |buffer| {
+                self.allocator.free(buffer);
+                self.heap_buffer = null;
             }
         }
 
@@ -61,11 +76,11 @@ pub fn DynamicString(stack_buffer_size: comptime_int) type {
     };
 }
 
-pub const String8 = DynamicString(8);
-pub const String16 = DynamicString(16);
-pub const String32 = DynamicString(32);
-pub const String64 = DynamicString(64);
-pub const String128 = DynamicString(128);
-pub const String256 = DynamicString(256);
+pub const String8 = DynamicString(8, false);
+pub const String16 = DynamicString(16, false);
+pub const String32 = DynamicString(32, false);
+pub const String64 = DynamicString(64, false);
+pub const String128 = DynamicString(128, false);
+pub const String256 = DynamicString(256, false);
 
 pub const String = String32;

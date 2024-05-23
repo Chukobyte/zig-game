@@ -7,6 +7,7 @@ const game = @import("game.zig");
 const comps = @import("components.zig");
 
 const engine = @import("engine");
+const core = engine.core;
 const ec = engine.ec;
 
 const Vec2 = math.Vec2;
@@ -18,7 +19,8 @@ const Texture = zeika.Texture;
 const Font = zeika.Font;
 
 
-const Sprite = engine.core.Sprite;
+const Sprite = core.Sprite;
+const TextLabel = core.TextLabel;
 
 const ECContext = game.ECContext;
 const Entity = ECContext.Entity;
@@ -77,7 +79,7 @@ pub inline fn getSpriteButton(params: SpriteButtonParams) EntityTemplate {
                                                     var money: i32 = 0;
                                                 };
                                                 StaticData.money += 1;
-                                                text_label_comp.text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: {d}", .{ StaticData.money }) catch { unreachable; };
+                                                text_label_comp.text_label.setText("Money: {d}", .{ StaticData.money }) catch { unreachable; };
                                             }
                                         }
                                     }
@@ -103,21 +105,16 @@ pub inline fn getTextLabel(params: TextLabelParams) EntityTemplate {
     return .{
         .tag_list = Tags.initFromSlice(&.{ "text_label" }),
         .components = .{
-            // ec.constCompCast(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } }),
             ec.constCompCast(TransformComponent, &.{ .transform = .{ .position = params.position } }),
             null,
-            // ec.constCompCast(TextLabelComponent, &.{ .text_label = .{ .font = undefined, .color = Color.Red } }),
-            ec.constCompCast(TextLabelComponent, &.{ .text_label = .{ .font = params.font, .color = params.color } }),
+            ec.constCompCast(TextLabelComponent, &.{ .text_label = .{ .font = params.font, .text = TextLabel.String.init(std.heap.page_allocator), .color = params.color } }),
             null
         },
         .interface = .{
             .init = struct {
                 pub fn init(self: *Entity) void  {
-                    const StaticData = struct {
-                        var text_buffer: [256]u8 = undefined;
-                    };
                     if (self.getComponent(TextLabelComponent)) |text_label_comp| {
-                        text_label_comp.text_label.text = std.fmt.bufPrint(&StaticData.text_buffer, "Money: 0", .{}) catch { unreachable; };
+                        text_label_comp.text_label.text.set("Money: 0", .{}) catch { unreachable; };
                     }
                 }
             }.init
