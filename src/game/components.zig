@@ -42,12 +42,6 @@ pub const TextLabelComponent = struct {
 
     text_label: TextLabel,
 
-    pub fn init(comp: *anyopaque, entity: *ECContext.Entity) void {
-        _ = entity;
-        const text_label_comp: *@This() = @alignCast(@ptrCast(comp));
-        _ = text_label_comp;
-    }
-
     pub fn render(comp: *anyopaque, entity: *ECContext.Entity) void {
         const text_label_comp: *@This() = @alignCast(@ptrCast(comp));
         if (entity.getComponent(TransformComponent)) |transform_comp|  {
