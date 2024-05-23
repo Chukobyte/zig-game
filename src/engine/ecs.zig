@@ -49,7 +49,7 @@ pub fn TypeList(comptime types: []const type) type {
             return types[index];
         }
 
-        pub fn getIndex(comptime T: type) usize {
+        pub fn getIndex(comptime T: type) comptime_int {
             inline for (types, 0..types.len) |t, i| {
                 if (t == T) {
                     return i;
@@ -115,9 +115,21 @@ fn TypeBitMask(comptime types: []const type) type {
             self.setEnabled(T, true);
         }
 
+        pub inline fn setFlagsFromTypes(self: *@This(), comptime types_to_set: []const type) void {
+            self.unsetAll();
+            inline for (types_to_set) |T| {
+                self.set(T);
+            }
+        }
+
         pub inline fn unset(self: *@This(), comptime T: type) void {
             flag_utils.removeFlag(&self.mask, type_list.getFlag(T));
             self.setEnabled(T, false);
+        }
+
+        pub inline fn unsetAll(self: *@This()) void {
+            self.enabled_mask = @as(MaskType, 0);
+            self.mask = @as(MaskType, 0);
         }
 
         pub inline fn eql(self: *@This(), other: *@This()) bool {
@@ -205,11 +217,20 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
                 var new_system: *T = try allocator.create(T);
+                _ = try new_context.system_data_list.addOne();
+                var new_system_data: *ECSystemData = &new_context.system_data_list.items[i];
+                new_system_data.interface_instance = new_system;
+
+                if (@hasDecl(T, "getComponentTypes")) {
+                    const system_component_types = T.getComponentTypes();
+                    new_system_data.component_signature.setFlagsFromTypes(system_component_types);
+                } else {
+                    new_system_data.component_signature.unsetAll();
+                }
+
                 if (@hasDecl(T, "init")) {
                     new_system.init();
                 }
-                _ = try new_context.system_data_list.addOne();
-                new_context.system_data_list.items[i].interface_instance = new_system;
             }
 
             return new_context;

@@ -96,6 +96,9 @@ const TestECSystem = struct {
         _ = self;
         has_called_post_context_tick = true;
     }
+    pub fn getComponentTypes() []const type {
+        return &.{ DialogueComponent, TransformComponent };
+    }
 };
 
 test "type list test" {
