@@ -232,4 +232,9 @@ test "string test" {
     try test_string.set("String on heap!", .{});
     try std.testing.expectEqual(.heap, test_string.mode);
     try std.testing.expectEqualStrings("String on heap!", test_string.buffer);
+
+    const test_string2 = try string.String16.initAndSet(allocator, "Some nice text", .{});
+    try std.testing.expectEqual(.stack, test_string2.mode);
+    try std.testing.expectEqualStrings("Some nice text", test_string2.get());
+    defer test_string2.deinit();
 }

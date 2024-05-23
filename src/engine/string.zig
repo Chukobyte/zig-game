@@ -15,17 +15,18 @@ pub fn DynamicString(stack_buffer_size: comptime_int) type {
         buffer: []u8,
 
         pub fn init(allocator: std.mem.Allocator) @This() {
-            var new_string = @This(){
-                .allocator = allocator,
-                .mode = undefined,
-                .stack_buffer = undefined,
-                .buffer = undefined,
-            };
+            var new_string = @This(){ .allocator = allocator, .mode = undefined, .stack_buffer = undefined, .buffer = undefined, };
             new_string.set("", .{}) catch { unreachable; };
             return new_string;
         }
 
-        pub fn deinit(self: *@This()) void {
+        pub inline fn initAndSet(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !@This() {
+            var new_string = @This(){ .allocator = allocator, .mode = undefined, .stack_buffer = undefined, .buffer = undefined, };
+            try new_string.set(fmt, args);
+            return new_string;
+        }
+
+        pub fn deinit(self: *const @This()) void {
             if (self.heap_buffer) |buffer| {
                 self.allocator.free(buffer);
             }
@@ -50,8 +51,12 @@ pub fn DynamicString(stack_buffer_size: comptime_int) type {
             }
         }
 
-        pub inline fn get(self: *@This()) []const u8 {
+        pub inline fn get(self: *const @This()) []const u8 {
             return self.buffer;
+        }
+
+        pub inline fn getLen(self: *@This()) usize {
+            return self.buffer.len;
         }
     };
 }
