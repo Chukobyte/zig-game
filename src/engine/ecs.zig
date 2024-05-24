@@ -69,6 +69,15 @@ pub fn TypeList(comptime types: []const type) type {
             }
             return flags;
         }
+
+        pub fn hasType(comptime T: type) bool {
+            inline for (types) |OtherT| {
+                if (T == OtherT) {
+                    return true;
+                }
+            }
+            return false;
+        }
     };
 }
 
@@ -306,6 +315,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         //--- Entity --- //
 
         pub fn initEntity(self: *@This(), comptime params: InitEntityParams) !Entity {
+            if (comptime params.interface != null and !entity_interface_type_list.hasType(params.interface.?)) {
+                @compileLog("Initialized an entity with unregistered entity interface '{any}'!", .{ params.interface.? });
+            }
+
             const new_entity = self.entity_id_counter;
             defer self.entity_id_counter += 1;
 
