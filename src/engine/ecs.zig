@@ -205,6 +205,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub const ECSystemData = struct {
             interface_instance: *anyopaque,
             component_signature: TypeBitMask(component_types) = .{},
+            entities: std.ArrayList(Entity),
         };
 
         /// Optional parameters for creating an entity
@@ -234,6 +235,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 _ = try new_context.system_data_list.addOne();
                 var new_system_data: *ECSystemData = &new_context.system_data_list.items[i];
                 new_system_data.interface_instance = new_system;
+                new_system_data.entities = std.ArrayList(Entity).init(allocator);
 
                 if (@hasDecl(T, "getComponentTypes")) {
                     const system_component_types = T.getComponentTypes();
@@ -481,17 +483,23 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         fn refreshECSystemsComponentState(self: *@This(), entity: Entity) void {
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
-            inline for (self.system_data_list.items, 0..system_types.len) |system_data, i| {
+            inline for (self.system_data_list.items, 0..system_types.len) |*system_data, i| {
                 const T: type = system_type_list.getType(i);
                 const is_system_compatible = entity_data.component_signature.contains(&system_data.component_signature);
                 if (is_system_compatible and !entity_data.is_in_system_map[i]) {
                     entity_data.is_in_system_map[i] = true;
+                    system_data.entities.append(entity) catch { unreachable; };
                     if (@hasDecl(T, "onEntityRegistered")) {
                         var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
                         system.onEntityRegistered(self, entity);
                     }
                 } else if (!is_system_compatible and entity_data.is_in_system_map[i]) {
                     entity_data.is_in_system_map[i] = false;
+                    for (0..system_data.entities.items.len) |item_index| {
+                        if (system_data.entities.items[item_index] == entity) {
+                            _ = system_data.entities.swapRemove(item_index);
+                        }
+                    }
                     if (@hasDecl(T, "onEntityUnregistered")) {
                         var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
                         system.onEntityUnregistered(self, entity);
