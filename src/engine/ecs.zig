@@ -262,8 +262,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             // Pre entity tick
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "preContextTick")) {
+                    var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                     system.preContextTick(self);
                 }
             }
@@ -286,8 +286,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             // Post entity tick
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "postContextTick")) {
+                    var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                     system.postContextTick(self);
                 }
             }
@@ -296,8 +296,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub fn render(self: *@This()) void {
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "render")) {
+                    var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                     system.render(self);
                 }
             }
