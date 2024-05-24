@@ -314,6 +314,31 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         //--- Entity --- //
 
+        /// Wrapper around an entity integer that simplifies entity operations
+        pub const WeakEntityRef = struct {
+            id: Entity,
+            context: *ECSContextType,
+
+            pub inline fn deinit(self: *@This()) void {
+                self.context.deinitEntity(self.id);
+            }
+            pub inline fn isValid(self: *const @This()) bool {
+                return self.context.isEntityValid(self.id);
+            }
+            pub inline fn setComponent(self: *@This(), comptime T: type, component: *const T) !void {
+                return self.context.setComponent(self.id, T, component);
+            }
+            pub inline fn getComponent(self: *@This(), comptime T: type) ?*T {
+                return self.context.getComponent(self.id, T);
+            }
+            pub inline fn removeComponent(self: *@This(), comptime T: type) !void {
+                return self.context.removeComponent(self.id, T);
+            }
+            pub inline fn hasComponent(self: *@This(), comptime T: type) bool {
+                return self.context.hasComponent(self.id, T);
+            }
+        };
+
         pub fn initEntity(self: *@This(), comptime params: InitEntityParams) !Entity {
             if (comptime params.interface != null and !entity_interface_type_list.hasType(params.interface.?)) {
                 @compileLog("Initialized an entity with unregistered entity interface '{any}'!", .{ params.interface.? });
@@ -424,11 +449,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         pub fn removeComponent(self: *@This(), entity: Entity, comptime T: type) void {
-            if (hasComponent(self, T)) {
+            if (self.hasComponent(entity, T)) {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
                 const comp_index: usize = component_type_list.getIndex(T);
 
-                const comp_ptr: *T = @alignCast(@ptrCast(self.components[comp_index]));
+                const comp_ptr: *T = @alignCast(@ptrCast(entity_data.components[comp_index]));
                 self.allocator.destroy(comp_ptr);
                 entity_data.components[comp_index] = null;
                 entity_data.component_signature.unset(T);

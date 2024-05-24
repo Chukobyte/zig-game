@@ -98,6 +98,7 @@ const ECSContext = ecs.ECSContext(.{
 
 test "ecs test" {
     const Entity = ECSContext.Entity;
+    const WeakEntityRef = ECSContext.WeakEntityRef;
 
     var ecs_context = try ECSContext.init(std.testing.allocator);
 
@@ -132,6 +133,20 @@ test "ecs test" {
     try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);
 
     ecs_context.render();
+
+    // Test weak entity ref
+    const new_entity2: Entity = try ecs_context.initEntity(.{});
+    var weak_entity2_ref = WeakEntityRef{ .id = new_entity2, .context = &ecs_context };
+    try std.testing.expectEqual(true, weak_entity2_ref.isValid());
+    try std.testing.expectEqual(false, weak_entity2_ref.hasComponent(TransformComponent));
+    try weak_entity2_ref.setComponent(TransformComponent, &.{ .transform = .{} });
+    try std.testing.expectEqual(true, weak_entity2_ref.hasComponent(TransformComponent));
+    const entity2_transform_comp = weak_entity2_ref.getComponent(TransformComponent);
+    try std.testing.expectEqual(true, entity2_transform_comp != null);
+    try weak_entity2_ref.removeComponent(TransformComponent);
+    try std.testing.expectEqual(false, weak_entity2_ref.hasComponent(TransformComponent));
+    weak_entity2_ref.deinit();
+    try std.testing.expectEqual(false, weak_entity2_ref.isValid());
 
     // Test system interface
     ecs_context.deinit();
