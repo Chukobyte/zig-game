@@ -102,7 +102,7 @@ test "ecs test" {
     var ecs_context = try ECSContext.init(std.testing.allocator);
 
     try std.testing.expectEqual(false, ecs_context.isEntityValid(0));
-    const new_entity: Entity = try ecs_context.initEntity(.{ .interface_type = TestEntityInterface });
+    const new_entity: Entity = try ecs_context.initEntity(.{ .interface = TestEntityInterface });
     try std.testing.expectEqual(true, ecs_context.isEntityValid(0));
 
     // Test component state

@@ -84,7 +84,7 @@ pub fn run() !void {
     );
     defer default_font.deinit();
 
-    const sprite_button_entity = try ecs_context.initEntity(.{ .interface_type = SpriteButtonInterface, .tags = &.{ "sprite" } });
+    const sprite_button_entity = try ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
     try ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
     try ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
         .sprite = .{
@@ -95,7 +95,7 @@ pub fn run() !void {
         },
     });
 
-    const text_label_entity = try ecs_context.initEntity(.{});
+    const text_label_entity = try ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
     try ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
     try ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
         .font = default_font, .text = try TextLabel.String.initAndSet(allocator, "Money: 0", .{}), .color = Color.Red }

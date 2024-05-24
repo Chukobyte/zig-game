@@ -200,7 +200,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         /// Optional parameters for creating an entity
         pub const InitEntityParams = struct {
-            interface_type: ?type = null,
+            interface: ?type = null,
             tags: ?[]const []const u8 = null,
         };
 
@@ -316,7 +316,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 entity_data.component_signature.unsetAll();
             }
             var entity_data: *EntityData = &self.entity_data_list.items[new_entity];
-            if (params.interface_type) |T| {
+            if (params.interface) |T| {
                 var new_interface: *T = try self.allocator.create(T);
                 if (@hasDecl(T, "init")) {
                     new_interface.init(self, new_entity);
