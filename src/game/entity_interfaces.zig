@@ -33,7 +33,6 @@ pub const SpriteButtonInterface = struct {
     money: i32 = 0,
 
     pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
-        std.debug.print("entity = {d}\n", .{ entity });
         if (context.getComponent(entity, TransformComponent)) |trans_comp| {
             if (context.getComponent(entity, SpriteComponent)) |sprite_comp| {
                 if (context.getComponent(entity, ColliderComponent)) |collider_comp| {

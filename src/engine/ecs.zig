@@ -323,6 +323,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 if (@hasDecl(T, "init")) {
                     new_interface.init(self, new_entity);
                 }
+                entity_data.interface_instance = new_interface;
             } else {
                 entity_data.interface_instance = null;
             }

@@ -41,6 +41,7 @@ const ColliderComponent = comps.ColliderComponent;
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
+    .entity_interfaces = &.{ SpriteButtonInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem },
 });
