@@ -70,8 +70,12 @@ pub fn DynamicString(stack_buffer_size: comptime_int, comptime auto_free_heap: b
             return self.buffer;
         }
 
-        pub inline fn getLen(self: *@This()) usize {
+        pub inline fn getLen(self: *const @This()) usize {
             return self.buffer.len;
+        }
+
+        pub inline fn isEmpty(self: *const @This()) bool {
+            return self.getLen() == 0;
         }
     };
 }

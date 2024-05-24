@@ -7,7 +7,6 @@ const game = @import("game");
 
 const data_db = engine.data_db;
 const core = engine.core;
-const ec = engine.ec;
 const ecs = engine.ecs;
 const string = engine.string;
 
@@ -15,40 +14,8 @@ const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
 const Property = data_db.Property;
 
-var has_test_entity_init = false;
-var has_test_entity_deinit = false;
-var has_test_entity_updated = false;
-
-var dialogue_comp_init = false;
-var dialogue_comp_deinit = false;
-var dialogue_comp_update = false;
-
 const DialogueComponent = struct {
     text: []const u8,
-
-    pub fn init(comp: *anyopaque, entity: *ECContext.Entity) void {
-        _ = entity;
-        const dial_comp: *@This() = @alignCast(@ptrCast(comp));
-        if (std.mem.eql(u8, "Test speech!", dial_comp.text)) {
-            dialogue_comp_init = true;
-        }
-    }
-
-    pub fn deinit(comp: *anyopaque, entity: *ECContext.Entity) void {
-        _ = entity;
-        const dial_comp: *@This() = @alignCast(@ptrCast(comp));
-        if (std.mem.eql(u8, "New Message", dial_comp.text)) {
-            dialogue_comp_deinit = true;
-        }
-    }
-
-    pub fn update(comp: *anyopaque, entity: *ECContext.Entity) void {
-        _ = entity;
-        const dial_comp: *@This() = @alignCast(@ptrCast(comp));
-        if (std.mem.eql(u8, "Test speech!", dial_comp.text)) {
-            dialogue_comp_update = true;
-        }
-    }
 };
 
 const TransformComponent = struct {
@@ -60,16 +27,16 @@ const TestEntityInterface = struct {
     var has_called_deinit = false;
     var has_called_tick = false;
 
-    pub fn init(self: *TestEntityInterface, context: *ECSContext) void {
-        _ = self; _ = context;
+    pub fn init(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
+        _ = self; _ = context; _ = entity;
         has_called_init = true;
     }
-    pub fn deinit(self: *TestEntityInterface, context: *ECSContext) void {
-        _ = self; _ = context;
+    pub fn deinit(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
+        _ = self; _ = context; _ = entity;
         has_called_deinit = true;
     }
-    pub fn tick(self: *TestEntityInterface, context: *ECSContext) void {
-        _ = self; _ = context;
+    pub fn tick(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
+        _ = self; _ = context; _ = entity;
         has_called_tick = true;
     }
 };
@@ -111,13 +78,11 @@ const TestECSystem = struct {
         _ = self; _ = context; _ = entity;
         has_called_entity_unregistered = true;
     }
-    pub fn getComponentTypes() []const type {
-        return &.{ DialogueComponent, TransformComponent };
-    }
+    pub fn getComponentTypes() []const type { return &.{ DialogueComponent, TransformComponent }; }
 };
 
 test "type list test" {
-    const TestTypeList = ec.TypeList(&.{ DialogueComponent, TransformComponent });
+    const TestTypeList = ecs.TypeList(&.{ DialogueComponent, TransformComponent });
     try std.testing.expectEqual(0, TestTypeList.getIndex(DialogueComponent));
     try std.testing.expectEqual(1, TestTypeList.getIndex(TransformComponent));
     try std.testing.expectEqual(DialogueComponent, TestTypeList.getType(0));
@@ -159,6 +124,7 @@ test "ecs test" {
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
+    try std.testing.expectEqual(false, TestEntityInterface.has_called_tick);
     ecs_context.tick();
     try std.testing.expectEqual(true, TestEntityInterface.has_called_tick);
     ecs_context.deinitEntity(new_entity);
@@ -178,70 +144,8 @@ test "ecs test" {
     try std.testing.expectEqual(true, TestECSystem.has_called_entity_unregistered);
 }
 
-const ECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });
-
-test "entity component test" {
-    var ec_context = ECContext.init(std.testing.allocator);
-    defer ec_context.deinit();
-
-    const test_entity_template = ECContext.EntityTemplate{
-        .interface = .{
-            .init = struct {
-                pub fn init(self: *ECContext.Entity) void {
-                    _ = self;
-                    has_test_entity_init = true;
-                }
-            }.init,
-            .deinit = struct {
-                pub fn deinit(self: *ECContext.Entity) void {
-                    _ = self;
-                    has_test_entity_deinit = true;
-                }
-            }.deinit,
-            .update = struct {
-                pub fn update(self: *ECContext.Entity) void {
-                    _ = self;
-                    has_test_entity_updated = true;
-                }
-            }.update,
-        },
-        // .components = .{ @as(*anyopaque, @constCast(@ptrCast(&DialogueComponent{ .text = "Test" }))), @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
-        .components = .{ null, @as(*anyopaque, @constCast(@ptrCast(&TransformComponent{ .transform = math.Transform2D.Identity }))) }
-    };
-    var test_entity = try ec_context.initEntity(&test_entity_template);
-    try std.testing.expect(test_entity.hasComponent(TransformComponent));
-    try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
-    try test_entity.setComponent(DialogueComponent, &.{ .text = "Test speech!" });
-    try std.testing.expect(test_entity.hasComponent(DialogueComponent));
-
-    if (test_entity.getComponent(DialogueComponent)) |found_comp| {
-        try std.testing.expectEqualStrings("Test speech!", found_comp.text);
-    } else {
-        try std.testing.expect(false);
-    }
-
-    ec_context.updateEntities();
-
-    try test_entity.setComponent(DialogueComponent, &.{ .text = "New Message" });
-    const found_dialogue_comp = test_entity.getComponentChecked(DialogueComponent);
-    try std.testing.expectEqualStrings("New Message", found_dialogue_comp.text);
-
-    test_entity.removeComponent(DialogueComponent);
-    try std.testing.expect(!test_entity.hasComponent(DialogueComponent));
-
-    ec_context.deinitEntity(test_entity);
-
-    try std.testing.expect(dialogue_comp_init);
-    try std.testing.expect(dialogue_comp_deinit);
-    try std.testing.expect(dialogue_comp_update);
-
-    try std.testing.expect(has_test_entity_init);
-    try std.testing.expect(has_test_entity_deinit);
-    try std.testing.expect(has_test_entity_updated);
-}
-
 test "tag list test" {
-    const Tags = ec.TagList(2);
+    const Tags = ecs.TagList(2);
     const tag_list = Tags.initFromSlice(&.{ "test", "okay" });
     try std.testing.expectEqual(2, tag_list.tag_count);
     try std.testing.expectEqualStrings("test", tag_list.tags[0]);
@@ -343,7 +247,9 @@ test "string test" {
     const allocator = std.testing.allocator;
     var test_string = string.String8.init(allocator);
     defer test_string.deinit();
+    try std.testing.expectEqual(true, test_string.isEmpty());
     try test_string.set("StackOk", .{});
+    try std.testing.expectEqual(false, test_string.isEmpty());
     try std.testing.expectEqual(.stack, test_string.mode);
     try std.testing.expectEqualStrings("StackOk", test_string.get());
     try test_string.set("String on heap!", .{});

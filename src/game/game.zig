@@ -8,10 +8,9 @@ const engine = @import("engine");
 
 const comps = @import("components.zig");
 const ec_systems = @import("ec_systems.zig");
-const et = @import("entity_templates.zig");
+const entity_interfaces = @import("entity_interfaces.zig");
 
 const core = engine.core;
-const ec = engine.ec;
 const ecs = engine.ecs;
 
 const Renderer = zeika.Renderer;
@@ -32,6 +31,8 @@ const MainSystem = ec_systems.MainSystem;
 const SpriteRenderingSystem = ec_systems.SpriteRenderingSystem;
 const TextRenderingSystem = ec_systems.TextRenderingSystem;
 
+const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
+
 const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
@@ -43,9 +44,6 @@ pub const ECSContext = ecs.ECSContext(.{
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem },
 });
-
-pub const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent });
-var ec_context: ECContext = undefined;
 
 var is_game_running = false;
 
@@ -71,11 +69,10 @@ pub fn deinit() void {
 
 pub fn run() !void {
     is_game_running = true;
+    const allocator = std.heap.page_allocator;
 
-    ec_context = ECContext.init(std.heap.page_allocator);
-    defer ec_context.deinit();
-    const Entity = ECContext.Entity;
-    const EntityTemplate = ECContext.EntityTemplate;
+    var ecs_context = try ECSContext.init(allocator);
+    defer ecs_context.deinit();
 
     const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
     defer Texture.deinit(texture_handle);
@@ -87,22 +84,9 @@ pub fn run() !void {
     );
     defer default_font.deinit();
 
-    // Entity definitions, would like to be replace with initial scene/world definitions
-    const main_template: EntityTemplate = .{
-        .interface = .{
-            .update = struct {
-                fn update(self: *Entity) void {
-                    _ = self;
-                    if (zeika.isKeyJustPressed(.keyboard_escape, 0)) {
-                        is_game_running = false;
-                    }
-                }
-            }.update,
-        }
-    };
-
-    const sprite_button_template: EntityTemplate = et.getSpriteButton(.{
-        .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } },
+    const sprite_button_entity = try ecs_context.initEntity(.{ .interface_type = SpriteButtonInterface, .tags = &.{ "sprite" } });
+    try ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
+    try ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
         .sprite = .{
             .texture = texture_handle,
             .size = .{ .x = 64.0, .y = 64.0 },
@@ -110,18 +94,17 @@ pub fn run() !void {
             .modulate = Color.Blue
         },
     });
-    const text_label_template: EntityTemplate = et.getTextLabel(.{
-        .font = default_font, .position = .{ .x = 100.0, .y = 200.0 }, .color = Color.Red
-    });
 
-    _ = try ec_context.initEntity(&main_template);
-    _ = try ec_context.initEntity(&sprite_button_template);
-    _ = try ec_context.initEntity(&text_label_template);
+    const text_label_entity = try ecs_context.initEntity(.{});
+    try ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
+    try ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
+        .font = default_font, .text = try TextLabel.String.initAndSet(allocator, "Money: 0", .{}), .color = Color.Red }
+    });
 
     while (isGameRunning()) {
         zeika.update();
-        ec_context.updateEntities();
-        ec_context.renderEntities();
+        ecs_context.tick();
+        ecs_context.render();
         Renderer.flushBatches();
     }
 }

@@ -201,6 +201,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         /// Optional parameters for creating an entity
         pub const InitEntityParams = struct {
             interface_type: ?type = null,
+            tags: ?[]const []const u8 = null,
         };
 
         //--- ECSContext --- //
@@ -267,14 +268,14 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
 
             // Tick entities
-            for (self.entity_data_list.items) |*entity_data| {
+            for (self.entity_data_list.items, 0..self.entity_data_list.items.len) |*entity_data, entity| {
                 if (entity_data.interface_instance) |interface_instance| {
                     inline for (0..entity_interface_types.len) |i| {
                         const T: type = entity_interface_type_list.getType(i);
                         if (T == entity_interface_types[i]) {
-                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "tick")) {
-                                interface_ptr.tick(self);
+                                const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
+                                interface_ptr.tick(self, entity);
                             }
                         }
                     }
@@ -304,24 +305,30 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         //--- Entity --- //
 
         pub fn initEntity(self: *@This(), comptime params: InitEntityParams) !Entity {
-            const newEntity = self.entity_id_counter;
+            const new_entity = self.entity_id_counter;
             defer self.entity_id_counter += 1;
 
-            if (newEntity >= self.entity_data_list.items.len) {
+            if (new_entity >= self.entity_data_list.items.len) {
                 var entity_data: *EntityData = try self.entity_data_list.addOne();
                 for (0..component_type_list.len) |i| {
                     entity_data.components[i] = null;
                 }
                 entity_data.component_signature.unsetAll();
             }
-            var entity_data: *EntityData = &self.entity_data_list.items[newEntity];
+            var entity_data: *EntityData = &self.entity_data_list.items[new_entity];
             if (params.interface_type) |T| {
                 var new_interface: *T = try self.allocator.create(T);
                 if (@hasDecl(T, "init")) {
-                    new_interface.init(self);
+                    new_interface.init(self, new_entity);
                 }
             } else {
                 entity_data.interface_instance = null;
+            }
+
+            if (params.tags) |tags| {
+                entity_data.tag_list = Tags.initFromSlice(tags);
+            } else {
+                entity_data.tag_list = .{};
             }
 
             inline for (0..system_types.len) |i| {
@@ -329,7 +336,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
             entity_data.is_valid = true;
 
-            return newEntity;
+            return new_entity;
         }
 
         pub fn deinitEntity(self: *@This(), entity: Entity) void {
@@ -343,7 +350,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         if (entity_data.interface_instance) |interface_instance| {
                             const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "deinit")) {
-                                interface_ptr.deinit(self);
+                                interface_ptr.deinit(self, entity);
                             }
                             self.allocator.destroy(interface_ptr);
                             entity_data.interface_instance = null;
@@ -362,6 +369,16 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 entity_data.tag_list = .{};
                 entity_data.is_valid = false;
             }
+        }
+
+        /// Returns first entity that matches a tag
+        pub fn getEntityByTag(self: *@This(), tag: []const u8) ?Entity {
+            for (self.entity_data_list.items, 0..self.entity_data_list.items.len) |entity_data, i| {
+                if (entity_data.is_valid and entity_data.tag_list.hasTag(tag)) {
+                    return i;
+                }
+            }
+            return null;
         }
 
         pub inline fn isEntityValid(self: *@This(), entity: Entity) bool {
@@ -384,7 +401,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub fn getComponent(self: *@This(), entity: Entity, comptime T: type) ?*T {
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index: usize = component_type_list.getIndex(T);
-            if (entity_data.components[comp_index].data) |comp| {
+            if (entity_data.components[comp_index]) |comp| {
                 return @alignCast(@ptrCast(comp));
             }
             return null;
