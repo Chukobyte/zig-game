@@ -221,6 +221,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
                 var new_system: *T = try allocator.create(T);
+                new_system.* = T{}; // Systems need to be able to be default constructed for now
                 _ = try new_context.system_data_list.addOne();
                 var new_system_data: *ECSystemData = &new_context.system_data_list.items[i];
                 new_system_data.interface_instance = new_system;
@@ -318,6 +319,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             var entity_data: *EntityData = &self.entity_data_list.items[new_entity];
             if (params.interface) |T| {
                 var new_interface: *T = try self.allocator.create(T);
+                new_interface.* = T{}; // Interfaces must be able to be default constructed for now
                 if (@hasDecl(T, "init")) {
                     new_interface.init(self, new_entity);
                 }
