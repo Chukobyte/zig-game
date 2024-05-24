@@ -7,10 +7,12 @@ const assets = @import("assets");
 const engine = @import("engine");
 
 const comps = @import("components.zig");
+const ec_systems = @import("ec_systems.zig");
 const et = @import("entity_templates.zig");
 
 const core = engine.core;
 const ec = engine.ec;
+const ecs = engine.ecs;
 
 const Renderer = zeika.Renderer;
 const Texture = zeika.Texture;
@@ -26,12 +28,21 @@ const Collision = core.Collision;
 const Camera = core.Camera;
 const GameProperties = core.GameProperties;
 
+const MainSystem = ec_systems.MainSystem;
+const SpriteRenderingSystem = ec_systems.SpriteRenderingSystem;
+const TextRenderingSystem = ec_systems.TextRenderingSystem;
+
 const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const ColliderComponent = comps.ColliderComponent;
 
 var game_properties = GameProperties{};
+
+pub const ECSContext = ecs.ECSContext(.{
+    .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent },
+    .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem },
+});
 
 pub const ECContext = ec.ECContext(u32, &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent });
 var ec_context: ECContext = undefined;
@@ -119,7 +130,7 @@ pub inline fn isGameRunning() bool {
     return zeika.isRunning() and is_game_running;
 }
 
-pub inline fn quit() void {
+pub fn quit() void {
     is_game_running = false;
 }
 

@@ -60,16 +60,16 @@ const TestEntityInterface = struct {
     var has_called_deinit = false;
     var has_called_tick = false;
 
-    pub fn init(self: *TestEntityInterface) void {
-        _ = self;
+    pub fn init(self: *TestEntityInterface, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_init = true;
     }
-    pub fn deinit(self: *TestEntityInterface) void {
-        _ = self;
+    pub fn deinit(self: *TestEntityInterface, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_deinit = true;
     }
-    pub fn tick(self: *TestEntityInterface) void {
-        _ = self;
+    pub fn tick(self: *TestEntityInterface, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_tick = true;
     }
 };
@@ -79,31 +79,36 @@ const TestECSystem = struct {
     var has_called_deinit = false;
     var has_called_pre_context_tick = false;
     var has_called_post_context_tick = false;
+    var has_called_render = false;
     var has_called_entity_registered = false;
     var has_called_entity_unregistered = false;
 
-    pub fn init(self: *TestECSystem) void {
-        _ = self;
+    pub fn init(self: *TestECSystem, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_init = true;
     }
-    pub fn deinit(self: *TestECSystem) void {
-        _ = self;
+    pub fn deinit(self: *TestECSystem, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_deinit = true;
     }
-    pub fn preContextTick(self: *TestECSystem) void {
-        _ = self;
+    pub fn preContextTick(self: *TestECSystem, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_pre_context_tick = true;
     }
-    pub fn postContextTick(self: *TestECSystem) void {
-        _ = self;
+    pub fn postContextTick(self: *TestECSystem, context: *ECSContext) void {
+        _ = self; _ = context;
         has_called_post_context_tick = true;
     }
-    pub fn onEntityRegistered(self: *TestECSystem, entity: ECSContext.Entity) void {
-        _ = self; _ = entity;
+    pub fn render(self: *TestECSystem, context: *ECSContext) void {
+        _ = self; _ = context;
+        has_called_render = true;
+    }
+    pub fn onEntityRegistered(self: *TestECSystem, context: *ECSContext, entity: ECSContext.Entity) void {
+        _ = self; _ = context; _ = entity;
         has_called_entity_registered = true;
     }
-    pub fn onEntityUnregistered(self: *TestECSystem, entity: ECSContext.Entity) void {
-        _ = self; _ = entity;
+    pub fn onEntityUnregistered(self: *TestECSystem, context: *ECSContext, entity: ECSContext.Entity) void {
+        _ = self; _ = context; _ = entity;
         has_called_entity_unregistered = true;
     }
     pub fn getComponentTypes() []const type {
@@ -160,12 +165,15 @@ test "ecs test" {
     try std.testing.expectEqual(false, ecs_context.isEntityValid(new_entity));
     try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);
 
+    ecs_context.render();
+
     // Test system interface
     ecs_context.deinit();
     try std.testing.expectEqual(true, TestECSystem.has_called_init);
     try std.testing.expectEqual(true, TestECSystem.has_called_deinit);
     try std.testing.expectEqual(true, TestECSystem.has_called_pre_context_tick);
     try std.testing.expectEqual(true, TestECSystem.has_called_post_context_tick);
+    try std.testing.expectEqual(true, TestECSystem.has_called_render);
     try std.testing.expectEqual(true, TestECSystem.has_called_entity_registered);
     try std.testing.expectEqual(true, TestECSystem.has_called_entity_unregistered);
 }

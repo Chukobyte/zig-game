@@ -232,7 +232,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 }
 
                 if (@hasDecl(T, "init")) {
-                    new_system.init();
+                    new_system.init(&new_context);
                 }
             }
 
@@ -249,7 +249,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const T: type = system_type_list.getType(i);
                 var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "deinit")) {
-                    system.deinit();
+                    system.deinit(self);
                 }
                 self.allocator.destroy(system);
             }
@@ -262,7 +262,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const T: type = system_type_list.getType(i);
                 var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "preContextTick")) {
-                    system.preContextTick();
+                    system.preContextTick(self);
                 }
             }
 
@@ -274,7 +274,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         if (T == entity_interface_types[i]) {
                             const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "tick")) {
-                                interface_ptr.tick();
+                                interface_ptr.tick(self);
                             }
                         }
                     }
@@ -286,7 +286,17 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const T: type = system_type_list.getType(i);
                 var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
                 if (@hasDecl(T, "postContextTick")) {
-                    system.postContextTick();
+                    system.postContextTick(self);
+                }
+            }
+        }
+
+        pub fn render(self: *@This()) void {
+            inline for (0..system_type_list.len) |i| {
+                const T: type = system_type_list.getType(i);
+                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
+                if (@hasDecl(T, "render")) {
+                    system.render(self);
                 }
             }
         }
@@ -308,7 +318,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             if (params.interface_type) |T| {
                 var new_interface: *T = try self.allocator.create(T);
                 if (@hasDecl(T, "init")) {
-                    new_interface.init();
+                    new_interface.init(self);
                 }
             } else {
                 entity_data.interface_instance = null;
@@ -333,7 +343,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         if (entity_data.interface_instance) |interface_instance| {
                             const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "deinit")) {
-                                interface_ptr.deinit();
+                                interface_ptr.deinit(self);
                             }
                             self.allocator.destroy(interface_ptr);
                             entity_data.interface_instance = null;
@@ -420,22 +430,14 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     entity_data.is_in_system_map[i] = true;
                     if (@hasDecl(T, "onEntityRegistered")) {
                         var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
-                        system.onEntityRegistered(entity);
+                        system.onEntityRegistered(self, entity);
                     }
                 } else if (!is_system_compatible and entity_data.is_in_system_map[i]) {
                     entity_data.is_in_system_map[i] = false;
                     if (@hasDecl(T, "onEntityUnregistered")) {
                         var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
-                        system.onEntityUnregistered(entity);
+                        system.onEntityUnregistered(self, entity);
                     }
-                }
-            }
-
-            inline for (0..system_type_list.len) |i| {
-                const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
-                if (@hasDecl(T, "postContextTick")) {
-                    system.postContextTick();
                 }
             }
         }
