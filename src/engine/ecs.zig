@@ -302,6 +302,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 for (0..component_type_list.len) |i| {
                     entity_data.components[i] = null;
                 }
+                entity_data.component_signature.unsetAll();
             }
             var entity_data: *EntityData = &self.entity_data_list.items[newEntity];
             if (params.interface_type) |T| {

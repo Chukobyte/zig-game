@@ -144,6 +144,13 @@ test "ecs test" {
     ecs_context.setComponentEnabled(new_entity, DialogueComponent, false);
     try std.testing.expectEqual(false, ecs_context.isComponentEnabled(new_entity, DialogueComponent));
 
+    // Test before adding component for entity to register to test system
+    try std.testing.expectEqual(false, TestECSystem.has_called_entity_registered);
+    try std.testing.expectEqual(false, ecs_context.isComponentEnabled(new_entity, TransformComponent));
+    try ecs_context.setComponent(new_entity, TransformComponent, &.{ .transform = math.Transform2D.Identity });
+    try std.testing.expectEqual(true, ecs_context.isComponentEnabled(new_entity, TransformComponent));
+    try std.testing.expectEqual(true, TestECSystem.has_called_entity_registered);
+
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
