@@ -79,6 +79,8 @@ const TestECSystem = struct {
     var has_called_deinit = false;
     var has_called_pre_context_tick = false;
     var has_called_post_context_tick = false;
+    var has_called_entity_registered = false;
+    var has_called_entity_unregistered = false;
 
     pub fn init(self: *TestECSystem) void {
         _ = self;
@@ -96,6 +98,14 @@ const TestECSystem = struct {
         _ = self;
         has_called_post_context_tick = true;
     }
+    pub fn onEntityRegistered(self: *TestECSystem, entity: ECSContext.Entity) void {
+        _ = self; _ = entity;
+        has_called_entity_registered = true;
+    }
+    pub fn onEntityUnregistered(self: *TestECSystem, entity: ECSContext.Entity) void {
+        _ = self; _ = entity;
+        has_called_entity_unregistered = true;
+    }
     pub fn getComponentTypes() []const type {
         return &.{ DialogueComponent, TransformComponent };
     }
@@ -109,13 +119,14 @@ test "type list test" {
     try std.testing.expectEqual(TransformComponent, TestTypeList.getType(1));
 }
 
+const ECSContext = ecs.ECSContext(.{
+    .entity_type = usize,
+    .entity_interfaces = &.{ TestEntityInterface },
+    .components = &.{ DialogueComponent, TransformComponent },
+    .systems = &.{ TestECSystem },
+});
+
 test "ecs test" {
-    const ECSContext = ecs.ECSContext(.{
-        .entity_type = usize,
-        .entity_interfaces = &.{ TestEntityInterface },
-        .components = &.{ DialogueComponent, TransformComponent },
-        .systems = &.{ TestECSystem },
-    });
     const Entity = ECSContext.Entity;
 
     var ecs_context = try ECSContext.init(std.testing.allocator);
@@ -148,6 +159,8 @@ test "ecs test" {
     try std.testing.expectEqual(true, TestECSystem.has_called_deinit);
     try std.testing.expectEqual(true, TestECSystem.has_called_pre_context_tick);
     try std.testing.expectEqual(true, TestECSystem.has_called_post_context_tick);
+    try std.testing.expectEqual(true, TestECSystem.has_called_entity_registered);
+    try std.testing.expectEqual(true, TestECSystem.has_called_entity_unregistered);
 }
 
 const ECContext = ec.ECContext(u32, &.{ DialogueComponent, TransformComponent });

@@ -132,11 +132,11 @@ fn TypeBitMask(comptime types: []const type) type {
             self.mask = @as(MaskType, 0);
         }
 
-        pub inline fn eql(self: *@This(), other: *@This()) bool {
+        pub inline fn eql(self: *const @This(), other: *const @This()) bool {
             return self.mask == other.mask;
         }
 
-        pub inline fn contains(self: *@This(), other: *@This()) bool {
+        pub inline fn contains(self: *const @This(), other: *const @This()) bool {
             return flag_utils.containsFlags(self.mask, other.mask);
         }
 
@@ -148,7 +148,7 @@ fn TypeBitMask(comptime types: []const type) type {
             }
         }
 
-        pub inline fn isEnabled(self: *@This(), comptime T: type) bool {
+        pub inline fn isEnabled(self: *const @This(), comptime T: type) bool {
             return flag_utils.hasFlag(self.enabled_mask, type_list.getFlag(T));
         }
 
@@ -189,6 +189,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             tag_list: Tags = .{},
             component_signature: TypeBitMask(component_types) = .{},
             is_valid: bool = false,
+            is_in_system_map: [system_types.len]bool = undefined,
         };
 
         /// System related stuff
@@ -201,6 +202,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub const InitEntityParams = struct {
             interface_type: ?type = null,
         };
+
+        //--- ECSContext --- //
 
         allocator: std.mem.Allocator,
         entity_data_list: std.ArrayList(EntityData),
@@ -253,6 +256,43 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             self.system_data_list.deinit();
         }
 
+        pub fn tick(self: *@This()) void {
+            // Pre entity tick
+            inline for (0..system_type_list.len) |i| {
+                const T: type = system_type_list.getType(i);
+                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
+                if (@hasDecl(T, "preContextTick")) {
+                    system.preContextTick();
+                }
+            }
+
+            // Tick entities
+            for (self.entity_data_list.items) |*entity_data| {
+                if (entity_data.interface_instance) |interface_instance| {
+                    inline for (0..entity_interface_types.len) |i| {
+                        const T: type = entity_interface_type_list.getType(i);
+                        if (T == entity_interface_types[i]) {
+                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
+                            if (@hasDecl(T, "tick")) {
+                                interface_ptr.tick();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Post entity tick
+            inline for (0..system_type_list.len) |i| {
+                const T: type = system_type_list.getType(i);
+                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
+                if (@hasDecl(T, "postContextTick")) {
+                    system.postContextTick();
+                }
+            }
+        }
+
+        //--- Entity --- //
+
         pub fn initEntity(self: *@This(), comptime params: InitEntityParams) !Entity {
             const newEntity = self.entity_id_counter;
             defer self.entity_id_counter += 1;
@@ -272,6 +312,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             } else {
                 entity_data.interface_instance = null;
             }
+
+            inline for (0..system_types.len) |i| {
+                entity_data.is_in_system_map[i] = false;
+            }
             entity_data.is_valid = true;
 
             return newEntity;
@@ -280,6 +324,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub fn deinitEntity(self: *@This(), entity: Entity) void {
             if (self.isEntityValid(entity)) {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
+                entity_data.component_signature.unsetAll();
+                self.refreshECSystemsComponentState(entity);
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
@@ -312,12 +358,12 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         pub fn setComponent(self: *@This(), entity: Entity, comptime T: type, component: *const T) !void {
-            std.debug.assert(self.isEntityValid(entity));
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index = component_type_list.getIndex(T);
             if (!hasComponent(self, entity,T)) {
                 entity_data.components[comp_index] = try self.allocator.create(T);
                 entity_data.component_signature.set(T);
+                self.refreshECSystemsComponentState(entity);
             }
 
             const current_comp: *T = @alignCast(@ptrCast(entity_data.components[comp_index].?));
@@ -325,7 +371,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         pub fn getComponent(self: *@This(), entity: Entity, comptime T: type) ?*T {
-            std.debug.assert(self.isEntityValid(entity));
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index: usize = component_type_list.getIndex(T);
             if (entity_data.components[comp_index].data) |comp| {
@@ -335,7 +380,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         pub fn removeComponent(self: *@This(), entity: Entity, comptime T: type) void {
-            std.debug.assert(self.isEntityValid(entity));
             if (hasComponent(self, T)) {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
                 const comp_index: usize = component_type_list.getIndex(T);
@@ -344,54 +388,48 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 self.allocator.destroy(comp_ptr);
                 entity_data.components[comp_index] = null;
                 entity_data.component_signature.unset(T);
+                self.refreshECSystemsComponentState(entity);
             }
         }
 
         pub inline fn hasComponent(self: *@This(), entity: Entity, comptime T: type) bool {
-            std.debug.assert(self.isEntityValid(entity));
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index: usize = component_type_list.getIndex(T);
             return entity_data.components[comp_index] != null;
         }
 
         pub fn setComponentEnabled(self: *@This(), entity: Entity, comptime T: type, enabled: bool) void {
-            std.debug.assert(self.isEntityValid(entity));
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             entity_data.component_signature.setEnabled(T, enabled);
         }
 
         pub fn isComponentEnabled(self: *@This(), entity: Entity, comptime T: type) bool {
-            std.debug.assert(self.isEntityValid(entity));
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             return entity_data.component_signature.isEnabled(T);
         }
 
-        pub fn tick(self: *@This()) void {
-            // Pre entity tick
-            inline for (0..system_type_list.len) |i| {
-                const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
-                if (@hasDecl(T, "preContextTick")) {
-                    system.preContextTick();
-                }
-            }
+        // --- ECSystem --- //
 
-            // Tick entities
-            for (self.entity_data_list.items) |*entity_data| {
-                if (entity_data.interface_instance) |interface_instance| {
-                    inline for (0..entity_interface_types.len) |i| {
-                        const T: type = entity_interface_type_list.getType(i);
-                        if (T == entity_interface_types[i]) {
-                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
-                            if (@hasDecl(T, "tick")) {
-                                interface_ptr.tick();
-                            }
-                        }
+        fn refreshECSystemsComponentState(self: *@This(), entity: Entity) void {
+            const entity_data: *EntityData = &self.entity_data_list.items[entity];
+            inline for (self.system_data_list.items, 0..system_types.len) |system_data, i| {
+                const T: type = system_type_list.getType(i);
+                const is_system_compatible = entity_data.component_signature.contains(&system_data.component_signature);
+                if (is_system_compatible and !entity_data.is_in_system_map[i]) {
+                    entity_data.is_in_system_map[i] = true;
+                    if (@hasDecl(T, "onEntityRegistered")) {
+                        var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
+                        system.onEntityRegistered(entity);
+                    }
+                } else if (!is_system_compatible and entity_data.is_in_system_map[i]) {
+                    entity_data.is_in_system_map[i] = false;
+                    if (@hasDecl(T, "onEntityUnregistered")) {
+                        var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
+                        system.onEntityUnregistered(entity);
                     }
                 }
             }
 
-            // Post entity tick
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
                 var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
