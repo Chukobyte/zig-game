@@ -95,6 +95,7 @@ pub fn run() !void {
             .modulate = Color.Blue
         },
     });
+    try ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
 
     const text_label_entity = try ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
     try ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
