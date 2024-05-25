@@ -186,8 +186,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
     const entity_interface_type_list = TypeList(entity_interface_types);
     const system_type_list = TypeList(system_types);
 
-    const num_of_archetypes = 10;
-
     return struct {
         const ECSContextType = @This();
         pub const Entity = EntityIdType;
