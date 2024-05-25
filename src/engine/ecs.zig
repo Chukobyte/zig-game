@@ -186,6 +186,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
     const entity_interface_type_list = TypeList(entity_interface_types);
     const system_type_list = TypeList(system_types);
 
+    const num_of_archetypes = 10;
+
     return struct {
         const ECSContextType = @This();
         pub const Entity = EntityIdType;
@@ -260,7 +262,9 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
-                var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
+                const system_data: *ECSystemData = &self.system_data_list.items[i];
+                system_data.entities.deinit();
+                var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
                 if (@hasDecl(T, "deinit")) {
                     system.deinit(self);
                 }
@@ -498,6 +502,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     for (0..system_data.entities.items.len) |item_index| {
                         if (system_data.entities.items[item_index] == entity) {
                             _ = system_data.entities.swapRemove(item_index);
+                            break;
                         }
                     }
                     if (@hasDecl(T, "onEntityUnregistered")) {
