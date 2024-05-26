@@ -101,10 +101,10 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
             const arch_index = getIndex(component_types);
             const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
             const list_data = &archetype_list_data[arch_index];
-            main: for (0..list_data.num_of_sorted_components) |i| {
+            for (0..list_data.num_of_sorted_components) |i| {
                 for (0..list_data.num_of_components) |comp_i| {
                     if (comp_types[comp_i] != list_data.sorted_components[i][comp_i]) {
-                        continue :main;
+                        break;
                     }
                 }
                 return i;
@@ -208,7 +208,7 @@ test "archetype test" {
     try std.testing.expectEqual(0, ArcList.getIndex(TestArchetype0));
     try std.testing.expectEqual(1, ArcList.getIndex(TestArchetype1));
     try std.testing.expectEqual(0, ArcList.getSortIndex(TestArchetype0));
-    // try std.testing.expectEqual(0, ArcList.getSortIndex(TestArchetype1));
+    try std.testing.expectEqual(0, ArcList.getSortIndex(TestArchetype1));
 }
 
 test "type list test" {
