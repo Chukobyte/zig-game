@@ -145,6 +145,10 @@ fn TypeBitMask(comptime types: []const type) type {
             return self.mask == other.mask;
         }
 
+        pub inline fn eqlflags(self: *const @This(), other: MaskType) bool {
+            return self.mask == other;
+        }
+
         pub inline fn contains(self: *const @This(), other: *const @This()) bool {
             return flag_utils.containsFlags(self.mask, other.mask);
         }
@@ -201,6 +205,17 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
         pub fn getArchetypeCount() comptime_int {
             const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
             return archetype_list_data.len;
+        }
+
+        pub fn getSortedComponentsMax() comptime_int {
+            const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
+            var sorted_comp_max = 0;
+            for (archetype_list_data) |*list_data| {
+                if (list_data.num_of_sorted_components > sorted_comp_max) {
+                    sorted_comp_max = list_data.num_of_sorted_components;
+                }
+            }
+            return sorted_comp_max;
         }
 
         const ArchetypeListData = struct {
@@ -283,6 +298,9 @@ pub fn ECSContext(context_params: ECSContextParams) type {
     const component_type_list = TypeList(component_types);
     const entity_interface_type_list = TypeList(entity_interface_types);
     const system_type_list = TypeList(system_types);
+    const archetype_list = ArchetypeList(system_types, component_types);
+    const archetype_count = archetype_list.getArchetypeCount();
+    const sorted_components_max = archetype_list.getSortedComponentsMax();
 
     return struct {
         const ECSContextType = @This();
@@ -297,6 +315,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             component_signature: TypeBitMask(component_types) = .{},
             is_valid: bool = false,
             is_in_system_map: [system_types.len]bool = undefined,
+            is_in_archetype_map: [archetype_count]bool = undefined,
         };
 
         /// System related stuff
@@ -304,6 +323,16 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             interface_instance: *anyopaque,
             component_signature: TypeBitMask(component_types) = .{},
             entities: std.ArrayList(Entity),
+        };
+
+        const ArchetypeData = struct {
+            sorted_components: [sorted_components_max][component_types.len]*anyopaque = undefined,
+            entities: std.ArrayList(Entity),
+            systems: [system_types.len]ECSystemData = undefined,
+            system_count: usize = 0,
+            signature: usize,
+            num_of_components: usize,
+            num_of_sorted_components: usize = 0,
         };
 
         /// Optional parameters for creating an entity
@@ -317,6 +346,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         allocator: std.mem.Allocator,
         entity_data_list: std.ArrayList(EntityData),
         system_data_list: std.ArrayList(ECSystemData),
+        archetype_data_list: [archetype_count]ArchetypeData,
         entity_id_counter: Entity = @as(Entity, 0),
 
         pub fn init(allocator: std.mem.Allocator) !@This() {
@@ -324,7 +354,20 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .allocator = allocator,
                 .entity_data_list = std.ArrayList(EntityData).init(allocator),
                 .system_data_list = try std.ArrayList(ECSystemData).initCapacity(allocator, system_type_list.len),
+                .archetype_data_list = undefined,
             };
+
+            const arch_list = ArchetypeList(system_types, component_types);
+            const arch_list_data = comptime arch_list.generateArchetypeListData();
+
+            inline for (0..archetype_count) |i| {
+                const arch_data = &arch_list_data[i];
+                const data_list = &new_context.archetype_data_list[i];
+                data_list.entities = std.ArrayList(Entity).init(allocator);
+                data_list.signature = arch_data.signature;
+                data_list.num_of_components = arch_data.num_of_components;
+                data_list.num_of_sorted_components = arch_data.num_of_sorted_components;
+            }
 
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
@@ -338,6 +381,15 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 if (@hasDecl(T, "getComponentTypes")) {
                     const system_component_types = T.getComponentTypes();
                     new_system_data.component_signature.setFlagsFromTypes(system_component_types);
+
+                    inline for (0..archetype_count) |arch_i| {
+                        const data_list = &new_system_data.archetype_data_list[arch_i];
+                        if (new_system_data.component_signature.eqlFlags(data_list.signature)) {
+                            data_list.systems[data_list.system_count] = new_system;
+                            data_list.system_count += 1;
+                        }
+                    }
+
                 } else {
                     new_system_data.component_signature.unsetAll();
                 }
@@ -367,6 +419,12 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 self.allocator.destroy(system);
             }
             self.system_data_list.deinit();
+
+            inline for (0..archetype_count) |i| {
+                const data_list = &self.archetype_data_list[i];
+                data_list.entities.deinit();
+                std.mem.zeroes(data_list);
+            }
         }
 
         pub fn tick(self: *@This()) void {
