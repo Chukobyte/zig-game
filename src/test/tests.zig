@@ -81,104 +81,6 @@ const TestECSystem = struct {
     pub fn getComponentTypes() []const type { return &.{ DialogueComponent, TransformComponent }; }
 };
 
-pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type {
-    const CompTypeList = ecs.TypeList(comp_types);
-    return struct {
-
-        pub fn getIndex(component_types: []const type) comptime_int {
-            const types_sig = CompTypeList.getFlags(component_types);
-            const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
-            for (0..archetype_list_data.len) |i| {
-                const list_data = archetype_list_data[i];
-                if (types_sig == list_data.signature) {
-                    return i;
-                }
-            }
-            @compileError("Didn't pass in valid component types!");
-        }
-
-        pub fn getSortIndex(component_types: []const type) comptime_int {
-            const arch_index = getIndex(component_types);
-            const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
-            const list_data = &archetype_list_data[arch_index];
-            for (0..list_data.num_of_sorted_components) |i| {
-                for (0..list_data.num_of_components) |comp_i| {
-                    if (comp_types[comp_i] != list_data.sorted_components[i][comp_i]) {
-                        break;
-                    }
-                }
-                return i;
-            }
-            @compileError("Didn't pass in valid component types for sort index!");
-        }
-
-        pub fn getArchetypeCount() comptime_int {
-            const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
-            return archetype_list_data.len;
-        }
-
-        const ArchetypeListData = struct {
-            const sorted_components_max = 4;
-            const components_max = 16;
-
-            signature: usize,
-            num_of_components: usize,
-            num_of_sorted_components: usize = 0,
-            sorted_components: [sorted_components_max][components_max] type = undefined,
-        };
-
-        inline fn generateArchetypeListData() []ArchetypeListData {
-            var archetypes_count: usize = 0;
-            var archetype_list_data: [comp_types.len * comp_types.len]ArchetypeListData = undefined;
-
-            main: for (system_types) |T| {
-                if (@hasDecl(T, "getArchetype")) {
-                    const component_types = T.getArchetype();
-                    const archetype_sig = CompTypeList.getFlags(component_types);
-
-                    // Check if signature exists
-                    var add_new_archetype = true;
-                    for (0..archetypes_count) |arch_i| {
-                        const list_data = &archetype_list_data[arch_i];
-                        // It does exist, now determine if we need to add new sorted components
-                        if (archetype_sig == list_data.signature) {
-                            add_new_archetype = false;
-                            for (0..list_data.num_of_sorted_components) |i| {
-                                var is_duplicate = true;
-                                for (0..list_data.num_of_components) |comp_i| {
-                                    if (component_types[comp_i] != list_data.sorted_components[i][comp_i]) {
-                                        is_duplicate = false;
-                                        break;
-                                    }
-                                }
-                                // If it's a duplicate skip
-                                if (is_duplicate) {
-                                    continue :main;
-                                }
-                            }
-                            // No duplicates found, create new sorted comps row
-                            for (0..list_data.num_of_sorted_components) |i| {
-                                list_data.sorted_components[list_data.num_of_sorted_components][i] = component_types[i];
-                            }
-                            list_data.num_of_sorted_components += 1;
-                            continue :main;
-                        }
-                    }
-
-                    // Now that it doesn't exist add it
-                    archetype_list_data[archetypes_count] = ArchetypeListData{ .signature = archetype_sig, .num_of_components = component_types.len, .num_of_sorted_components = 1 };
-                    for (0..component_types.len) |i| {
-                        archetype_list_data[archetypes_count].sorted_components[0][i] = component_types[i];
-                    }
-
-                    archetypes_count += 1;
-                }
-            }
-            return archetype_list_data[0..archetypes_count];
-        }
-    };
-}
-
 test "archetype test" {
     const TestComp0 = struct {};
     const TestComp1 = struct {};
@@ -203,7 +105,7 @@ test "archetype test" {
     const TestArchetype0 = &.{ TestComp0, TestComp1 };
     const TestArchetype1 = &.{ TestComp0, TestComp2 };
 
-    const ArcList = ArchetypeList(&.{ TestSystem0, TestSystem1, TestSystem2 }, &.{ TestComp0, TestComp1, TestComp2 });
+    const ArcList = ecs.ArchetypeList(&.{ TestSystem0, TestSystem1, TestSystem2 }, &.{ TestComp0, TestComp1, TestComp2 });
     try std.testing.expectEqual(2, ArcList.getArchetypeCount());
     try std.testing.expectEqual(0, ArcList.getIndex(TestArchetype0));
     try std.testing.expectEqual(1, ArcList.getIndex(TestArchetype1));
