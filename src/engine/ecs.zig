@@ -322,7 +322,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub const ECSystemData = struct {
             interface_instance: *anyopaque,
             component_signature: TypeBitMask(component_types) = .{},
-            entities: std.ArrayList(Entity),
         };
 
         const ArchetypeData = struct {
@@ -376,7 +375,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 _ = try new_context.system_data_list.addOne();
                 var new_system_data: *ECSystemData = &new_context.system_data_list.items[i];
                 new_system_data.interface_instance = new_system;
-                new_system_data.entities = std.ArrayList(Entity).init(allocator);
 
                 if (@hasDecl(T, "getArchetype")) {
                     const system_component_types = T.getArchetype();
@@ -411,7 +409,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
                 const system_data: *ECSystemData = &self.system_data_list.items[i];
-                system_data.entities.deinit();
                 var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
                 if (@hasDecl(T, "deinit")) {
                     system.deinit(self);
@@ -544,7 +541,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             if (self.isEntityValid(entity)) {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
                 entity_data.component_signature.unsetAll();
-                self.refreshECSystemsComponentState(entity);
+                self.refreshArchetypeState(entity);
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
@@ -592,7 +589,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             if (!hasComponent(self, entity,T)) {
                 entity_data.components[comp_index] = try self.allocator.create(T);
                 entity_data.component_signature.set(T);
-                self.refreshECSystemsComponentState(entity);
+                self.refreshArchetypeState(entity);
             }
 
             const current_comp: *T = @alignCast(@ptrCast(entity_data.components[comp_index].?));
@@ -617,7 +614,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 self.allocator.destroy(comp_ptr);
                 entity_data.components[comp_index] = null;
                 entity_data.component_signature.unset(T);
-                self.refreshECSystemsComponentState(entity);
+                self.refreshArchetypeState(entity);
             }
         }
 
@@ -639,7 +636,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         // --- ECSystem --- //
 
-        fn refreshECSystemsComponentState(self: *@This(), entity: Entity) void {
+        fn refreshArchetypeState(self: *@This(), entity: Entity) void {
             const SystemNotifyState = enum {
                 none,
                 on_entity_registered,
