@@ -302,6 +302,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
     const archetype_count = archetype_list.getArchetypeCount();
     const sorted_components_max = archetype_list.getSortedComponentsMax();
 
+    const arch_list = ArchetypeList(system_types, component_types);
+
     return struct {
         const ECSContextType = @This();
         pub const Entity = EntityIdType;
@@ -325,7 +327,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         };
 
         const ArchetypeData = struct {
-            sorted_components: [sorted_components_max][component_types.len]*anyopaque = undefined,
+            sorted_components: std.ArrayList([sorted_components_max][component_types.len]*anyopaque) = undefined,
             entities: std.ArrayList(Entity) = undefined,
             systems: [system_types.len]usize = undefined, // System index
             system_count: usize = 0,
@@ -356,13 +358,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .archetype_data_list = undefined,
             };
 
-            const arch_list = ArchetypeList(system_types, component_types);
             const arch_list_data = comptime arch_list.generateArchetypeListData();
 
             inline for (0..archetype_count) |i| {
                 const arch_data = &arch_list_data[i];
                 const data_list = &new_context.archetype_data_list[i];
                 data_list.entities = std.ArrayList(Entity).init(allocator);
+                data_list.sorted_components = std.ArrayList([sorted_components_max][component_types.len]*anyopaque).init(allocator);
                 data_list.signature = arch_data.signature;
                 data_list.num_of_components = arch_data.num_of_components;
                 data_list.num_of_sorted_components = arch_data.num_of_sorted_components;
@@ -420,6 +422,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             inline for (0..archetype_count) |i| {
                 const data_list = &self.archetype_data_list[i];
                 data_list.entities.deinit();
+                data_list.sorted_components.deinit();
                 data_list.* = .{};
             }
         }
@@ -541,7 +544,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             if (self.isEntityValid(entity)) {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
                 entity_data.component_signature.unsetAll();
-                self.refreshArchetypeState(entity);
+                self.refreshArchetypeState(entity) catch {}; // Not worried about error
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
@@ -589,7 +592,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             if (!hasComponent(self, entity,T)) {
                 entity_data.components[comp_index] = try self.allocator.create(T);
                 entity_data.component_signature.set(T);
-                self.refreshArchetypeState(entity);
+                try self.refreshArchetypeState(entity);
             }
 
             const current_comp: *T = @alignCast(@ptrCast(entity_data.components[comp_index].?));
@@ -614,7 +617,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 self.allocator.destroy(comp_ptr);
                 entity_data.components[comp_index] = null;
                 entity_data.component_signature.unset(T);
-                self.refreshArchetypeState(entity);
+                self.refreshArchetypeState(entity) catch {}; // Ignore
             }
         }
 
@@ -636,7 +639,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         // --- ECSystem --- //
 
-        fn refreshArchetypeState(self: *@This(), entity: Entity) void {
+        fn refreshArchetypeState(self: *@This(), entity: Entity) !void {
             const SystemNotifyState = enum {
                 none,
                 on_entity_registered,
@@ -649,12 +652,32 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
 
+            const arch_list_data = comptime arch_list.generateArchetypeListData();
+
             inline for (0..archetype_count) |i| {
                 const data_list = &self.archetype_data_list[i];
                 const match_signature = FlagUtils(usize).containsFlags(entity_data.component_signature.mask, data_list.signature);
                 if (match_signature and !entity_data.is_in_archetype_map[i]) {
                     entity_data.is_in_archetype_map[i] = true;
                     data_list.entities.append(entity) catch { unreachable; };
+                    if (entity >= data_list.sorted_components.items.len) {
+                        _ = try data_list.sorted_components.addManyAsSlice(entity + 1 - data_list.sorted_components.items.len);
+                    }
+                    // Update sorted component arrays
+                    inline for (0..arch_list_data[i].num_of_sorted_components) |sort_comp_i| {
+                        inline for (0..arch_list_data[i].num_of_components) |comp_i| {
+                            // Map component pointers with order
+                            const CompT: type = arch_list_data[i].sorted_components[sort_comp_i][comp_i];
+                            data_list.sorted_components.items[entity][sort_comp_i][comp_i] = entity_data.components[component_type_list.getIndex(CompT)].?;
+                            if (comp_i + 1 >= data_list.num_of_components)  {
+                                break;
+                            }
+                        }
+                        if (sort_comp_i + 1 >= data_list.num_of_sorted_components)  {
+                            break;
+                        }
+                    }
+
                     for (0..data_list.system_count) |sys_i| {
                         const system_index = data_list.systems[sys_i];
                         Static.SystemState[system_index] = .on_entity_registered;
