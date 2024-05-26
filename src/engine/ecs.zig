@@ -336,17 +336,58 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             num_of_sorted_components: usize = 0,
         };
 
-        // pub fn ArchetypeComponentIterator(arch_comps: []const type) type {
-        //     return struct {
-        //
-        //         component_sort_slot: usize,
-        //
-        //         pub fn init(context: *ECSContextType) @This() {
-        //             _ = arch_comps;
-        //             _ = context;
-        //         }
-        //     };
-        // }
+        pub fn ArchetypeComponentIterator(arch_comps: []const type) type {
+            const comp_sort_index = archetype_list.getSortIndex(arch_comps);
+            const arch_index = archetype_list.getIndex(arch_comps);
+            const arch_list_data = comptime arch_list.generateArchetypeListData();
+            const list_data = comptime arch_list_data[arch_index];
+
+            return struct {
+
+                pub const Node = struct {
+                    components: *[list_data.num_of_components]*anyopaque,
+
+                    pub fn getComponent(self: *const @This(), comptime T: type) *T {
+                        inline for (0..list_data.num_of_components) |i| {
+                            if (T == list_data.sorted_components[comp_sort_index][i]) {
+                                return @alignCast(@ptrCast(self.components[i]));
+                            }
+                        }
+                        @compileError("Comp isn't in iterator!");
+                    }
+                };
+
+                current_entity: Entity,
+                archetype: *ArchetypeData,
+
+                pub fn init(context: *ECSContextType) @This() {
+                    const new_iterator = @This(){
+                        .current_entity = 0,
+                        .archetype = &context.archetype_data_list[arch_index],
+                    };
+                    return new_iterator;
+                }
+
+                pub fn next(self: *@This()) ?Node {
+                    if (self.current_entity < self.archetype.entities.items.len) {
+                        const node = Node{ .components = self.archetype.sorted_components.items[self.current_entity][comp_sort_index][0..] };
+                        self.current_entity += 1;
+                        // TODO: Make sure current entity is valid
+                        return node;
+                    }
+                    return null;
+                }
+
+                pub fn peek(self: *@This()) ?Node {
+                    if (self.current_entity < self.archetype.entities.items.len) {
+                        const node = Node{ .components = self.archetype.sorted_components.items[self.current_entity][comp_sort_index][0..] };
+                        // TODO: Make sure current entity is valid
+                        return node;
+                    }
+                    return null;
+                }
+            };
+        }
 
         /// Optional parameters for creating an entity
         pub const InitEntityParams = struct {
