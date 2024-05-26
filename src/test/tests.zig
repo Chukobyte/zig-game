@@ -81,6 +81,10 @@ const TestECSystem = struct {
     pub fn getArchetype() []const type { return &.{ DialogueComponent, TransformComponent }; }
 };
 
+const TestECSystem2 = struct {
+    pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
+};
+
 test "archetype test" {
     const TestComp0 = struct {};
     const TestComp1 = struct {};
@@ -131,7 +135,7 @@ const ECSContext = ecs.ECSContext(.{
     .entity_type = usize,
     .entity_interfaces = &.{ TestEntityInterface },
     .components = &.{ DialogueComponent, TransformComponent },
-    .systems = &.{ TestECSystem },
+    .systems = &.{ TestECSystem, TestECSystem2 },
 });
 
 test "ecs test" {
@@ -162,6 +166,7 @@ test "ecs test" {
 
     try std.testing.expectEqual(1, ecs_context.getArchetypeEntities(&.{ DialogueComponent, TransformComponent }).len);
 
+    // Component iterator tests
     var comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.next() != null);
     try std.testing.expectEqual(true, comp_iterator.next() == null);
@@ -175,6 +180,10 @@ test "ecs test" {
         const trans_comp = node.getComponent(TransformComponent);
         _ = trans_comp;
     }
+    // Changing order - TODO: Fix
+    // comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
+    // try std.testing.expectEqual(0, comp_iterator.getSlot(TransformComponent));
+    // try std.testing.expectEqual(1, comp_iterator.getSlot(DialogueComponent));
 
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);

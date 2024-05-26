@@ -735,7 +735,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         inline for (0..arch_list_data[i].num_of_components) |comp_i| {
                             // Map component pointers with order
                             const CompT: type = arch_list_data[i].sorted_components[sort_comp_i][comp_i];
-                            data_list.sorted_components.items[entity][sort_comp_i][comp_i] = entity_data.components[component_type_list.getIndex(CompT)].?;
+                            const entity_comp_index = component_type_list.getIndex(CompT);
+                            data_list.sorted_components.items[entity][sort_comp_i][comp_i] = entity_data.components[entity_comp_index].?;
                             if (comp_i + 1 >= data_list.num_of_components)  {
                                 break;
                             }
