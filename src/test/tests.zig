@@ -78,11 +78,11 @@ const TestECSystem = struct {
         _ = self; _ = context; _ = entity;
         has_called_entity_unregistered = true;
     }
-    // pub fn getArchetype() []const type { return &.{ DialogueComponent, TransformComponent }; }
+    pub fn getArchetype() []const type { return &.{ DialogueComponent, TransformComponent }; }
 };
 
 const TestECSystem2 = struct {
-    pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
+    // pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
 };
 
 test "archetype test" {
