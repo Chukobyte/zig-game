@@ -64,7 +64,7 @@ pub fn TypeList(comptime types: []const type) type {
 
         pub fn getFlags(comptime flag_types: []const type) usize {
             var flags: usize = 0;
-            for (flag_types) |flag_type| {
+            inline for (flag_types) |flag_type| {
                 flags |= getFlag(flag_type);
             }
             return flags;
@@ -81,7 +81,7 @@ pub fn TypeList(comptime types: []const type) type {
     };
 }
 
-fn FlagUtils(comptime T: type) type {
+pub fn FlagUtils(comptime T: type) type {
     return struct {
         pub inline fn hasFlag(flags: T, flag: T) bool {
             return (flags & flag) != 0;
