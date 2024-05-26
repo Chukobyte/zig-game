@@ -145,7 +145,7 @@ fn TypeBitMask(comptime types: []const type) type {
             return self.mask == other.mask;
         }
 
-        pub inline fn eqlflags(self: *const @This(), other: MaskType) bool {
+        pub inline fn eqlFlags(self: *const @This(), other: MaskType) bool {
             return self.mask == other;
         }
 
@@ -327,11 +327,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         const ArchetypeData = struct {
             sorted_components: [sorted_components_max][component_types.len]*anyopaque = undefined,
-            entities: std.ArrayList(Entity),
-            systems: [system_types.len]ECSystemData = undefined,
+            entities: std.ArrayList(Entity) = undefined,
+            systems: [system_types.len]usize = undefined, // System index
             system_count: usize = 0,
-            signature: usize,
-            num_of_components: usize,
+            signature: usize = 0,
+            num_of_components: usize = 0,
             num_of_sorted_components: usize = 0,
         };
 
@@ -378,14 +378,14 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 new_system_data.interface_instance = new_system;
                 new_system_data.entities = std.ArrayList(Entity).init(allocator);
 
-                if (@hasDecl(T, "getComponentTypes")) {
-                    const system_component_types = T.getComponentTypes();
+                if (@hasDecl(T, "getArchetype")) {
+                    const system_component_types = T.getArchetype();
                     new_system_data.component_signature.setFlagsFromTypes(system_component_types);
 
                     inline for (0..archetype_count) |arch_i| {
-                        const data_list = &new_system_data.archetype_data_list[arch_i];
+                        const data_list = &new_context.archetype_data_list[arch_i];
                         if (new_system_data.component_signature.eqlFlags(data_list.signature)) {
-                            data_list.systems[data_list.system_count] = new_system;
+                            data_list.systems[data_list.system_count] = i;
                             data_list.system_count += 1;
                         }
                     }
@@ -423,7 +423,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             inline for (0..archetype_count) |i| {
                 const data_list = &self.archetype_data_list[i];
                 data_list.entities.deinit();
-                std.mem.zeroes(data_list);
+                data_list.* = .{};
             }
         }
 
@@ -640,29 +640,61 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         // --- ECSystem --- //
 
         fn refreshECSystemsComponentState(self: *@This(), entity: Entity) void {
+            const SystemNotifyState = enum {
+                none,
+                on_entity_registered,
+                on_entity_unregistered,
+            };
+
+            const Static = struct {
+                var SystemState: [system_types.len]SystemNotifyState = undefined;
+            };
+
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
-            inline for (self.system_data_list.items, 0..system_types.len) |*system_data, i| {
-                const T: type = system_type_list.getType(i);
-                const is_system_compatible = entity_data.component_signature.contains(&system_data.component_signature);
-                if (is_system_compatible and !entity_data.is_in_system_map[i]) {
-                    entity_data.is_in_system_map[i] = true;
-                    system_data.entities.append(entity) catch { unreachable; };
-                    if (@hasDecl(T, "onEntityRegistered")) {
-                        var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
-                        system.onEntityRegistered(self, entity);
+
+            inline for (0..archetype_count) |i| {
+                const data_list = &self.archetype_data_list[i];
+                const match_signature = FlagUtils(usize).containsFlags(entity_data.component_signature.mask, data_list.signature);
+                if (match_signature and !entity_data.is_in_archetype_map[i]) {
+                    entity_data.is_in_archetype_map[i] = true;
+                    data_list.entities.append(entity) catch { unreachable; };
+                    for (0..data_list.system_count) |sys_i| {
+                        const system_index = data_list.systems[sys_i];
+                        Static.SystemState[system_index] = .on_entity_registered;
                     }
-                } else if (!is_system_compatible and entity_data.is_in_system_map[i]) {
-                    entity_data.is_in_system_map[i] = false;
-                    for (0..system_data.entities.items.len) |item_index| {
-                        if (system_data.entities.items[item_index] == entity) {
-                            _ = system_data.entities.swapRemove(item_index);
+                } else if (!match_signature and entity_data.is_in_archetype_map[i]) {
+                    entity_data.is_in_archetype_map[i] = false;
+                    for (0..data_list.entities.items.len) |item_index| {
+                        if (data_list.entities.items[item_index] == entity) {
+                            _ = data_list.entities.swapRemove(item_index);
                             break;
                         }
                     }
-                    if (@hasDecl(T, "onEntityUnregistered")) {
-                        var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
-                        system.onEntityUnregistered(self, entity);
+                    for (0..data_list.system_count) |sys_i| {
+                        const system_index = data_list.systems[sys_i];
+                        Static.SystemState[system_index] = .on_entity_unregistered;
                     }
+                }
+            }
+
+            inline for (self.system_data_list.items, 0..system_types.len) |*system_data, i| {
+                const T: type = system_type_list.getType(i);
+                switch (Static.SystemState[i]) {
+                    .on_entity_registered => {
+                        if (@hasDecl(T, "onEntityRegistered")) {
+                            var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
+                            system.onEntityRegistered(self, entity);
+                        }
+                        Static.SystemState[i] = .none;
+                    },
+                    .on_entity_unregistered => {
+                        if (@hasDecl(T, "onEntityUnregistered")) {
+                            var system: *T = @alignCast(@ptrCast(system_data.interface_instance));
+                            system.onEntityUnregistered(self, entity);
+                        }
+                        Static.SystemState[i] = .none;
+                    },
+                    .none => {},
                 }
             }
         }

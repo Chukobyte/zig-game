@@ -78,7 +78,7 @@ const TestECSystem = struct {
         _ = self; _ = context; _ = entity;
         has_called_entity_unregistered = true;
     }
-    pub fn getComponentTypes() []const type { return &.{ DialogueComponent, TransformComponent }; }
+    pub fn getArchetype() []const type { return &.{ DialogueComponent, TransformComponent }; }
 };
 
 test "archetype test" {
