@@ -167,7 +167,9 @@ test "ecs test" {
     try std.testing.expectEqual(true, comp_iterator.next() == null);
     comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.peek() != null);
-    if (comp_iterator.next()) |node| {
+    try std.testing.expectEqual(0, comp_iterator.getSlot(DialogueComponent));
+    try std.testing.expectEqual(1, comp_iterator.getSlot(TransformComponent));
+    while (comp_iterator.next()) |node| {
         const dialog_comp = node.getComponent(DialogueComponent);
         try std.testing.expectEqualStrings("Testing things!", dialog_comp.text);
         const trans_comp = node.getComponent(TransformComponent);

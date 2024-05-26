@@ -348,12 +348,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     components: *[list_data.num_of_components]*anyopaque,
 
                     pub fn getComponent(self: *const @This(), comptime T: type) *T {
-                        inline for (0..list_data.num_of_components) |i| {
-                            if (T == list_data.sorted_components[comp_sort_index][i]) {
-                                return @alignCast(@ptrCast(self.components[i]));
-                            }
-                        }
-                        @compileError("Comp isn't in iterator!");
+                        return @alignCast(@ptrCast(self.components[getComponentSlot(T)]));
                     }
                 };
 
@@ -385,6 +380,20 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         return node;
                     }
                     return null;
+                }
+
+                pub inline fn getSlot(self: *const @This(), comptime T: type) usize {
+                    _ = self;
+                    return getComponentSlot(T);
+                }
+
+                inline fn getComponentSlot(comptime T: type) usize {
+                    inline for (0..list_data.num_of_components) |i| {
+                        if (T == list_data.sorted_components[comp_sort_index][i]) {
+                            return i;
+                        }
+                    }
+                    @compileError("Comp isn't in iterator!");
                 }
             };
         }
