@@ -329,12 +329,24 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         const ArchetypeData = struct {
             sorted_components: std.ArrayList([sorted_components_max][component_types.len]*anyopaque) = undefined,
             entities: std.ArrayList(Entity) = undefined,
-            systems: [system_types.len]usize = undefined, // System index
+            systems: [system_types.len]usize = undefined, // System indices
             system_count: usize = 0,
             signature: usize = 0,
             num_of_components: usize = 0,
             num_of_sorted_components: usize = 0,
         };
+
+        // pub fn ArchetypeComponentIterator(arch_comps: []const type) type {
+        //     return struct {
+        //
+        //         component_sort_slot: usize,
+        //
+        //         pub fn init(context: *ECSContextType) @This() {
+        //             _ = arch_comps;
+        //             _ = context;
+        //         }
+        //     };
+        // }
 
         /// Optional parameters for creating an entity
         pub const InitEntityParams = struct {
@@ -637,7 +649,12 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             return entity_data.component_signature.isEnabled(T);
         }
 
-        // --- ECSystem --- //
+        // --- Archetype --- //
+
+        pub inline fn getArchetypeEntities(self: *@This(), arch_comps: []const type) []const Entity {
+            const arch_index = archetype_list.getIndex(arch_comps);
+            return self.archetype_data_list[arch_index].entities.items[0..];
+        }
 
         fn refreshArchetypeState(self: *@This(), entity: Entity) !void {
             const SystemNotifyState = enum {

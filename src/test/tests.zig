@@ -160,6 +160,8 @@ test "ecs test" {
     try std.testing.expectEqual(true, ecs_context.isComponentEnabled(new_entity, TransformComponent));
     try std.testing.expectEqual(true, TestECSystem.has_called_entity_registered);
 
+    try std.testing.expectEqual(1, ecs_context.getArchetypeEntities(&.{ DialogueComponent, TransformComponent }).len);
+
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
