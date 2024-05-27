@@ -264,7 +264,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
                                 }
                             }
                             // No duplicates found, create new sorted comps row
-                            for (0..list_data.num_of_sorted_components) |i| {
+                            for (0..list_data.num_of_components) |i| {
                                 list_data.sorted_components[list_data.num_of_sorted_components][i] = component_types[i];
                                 list_data.sorted_components_by_index[list_data.num_of_sorted_components][i] = i;
                             }
@@ -348,8 +348,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub fn ArchetypeComponentIterator(arch_comps: []const type) type {
             const comp_sort_index = archetype_list.getSortIndex(arch_comps);
             const arch_index = archetype_list.getIndex(arch_comps);
-            const arch_list_data = comptime arch_list.generateArchetypeListData();
-            const list_data = comptime arch_list_data[arch_index];
+            const arch_list_data = arch_list.generateArchetypeListData();
+            const list_data = arch_list_data[arch_index];
 
             return struct {
 
