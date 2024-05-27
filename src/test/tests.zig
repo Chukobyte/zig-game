@@ -167,7 +167,8 @@ test "ecs test" {
     try std.testing.expectEqual(1, ecs_context.getArchetypeEntities(&.{ DialogueComponent, TransformComponent }).len);
 
     // Component iterator tests
-    var comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
+    const ComponentIterator = ECSContext.ArchetypeComponentIterator;
+    var comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.next() != null);
     try std.testing.expectEqual(true, comp_iterator.next() == null);
     comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
@@ -181,9 +182,9 @@ test "ecs test" {
         _ = trans_comp;
     }
     // Changing order - TODO: fix
-    // comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
-    // try std.testing.expectEqual(0, comp_iterator.getSlot(TransformComponent));
-    // try std.testing.expectEqual(1, comp_iterator.getSlot(DialogueComponent));
+    // var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
+    // try std.testing.expectEqual(0, comp_iterator2.getSlot(TransformComponent));
+    // try std.testing.expectEqual(1, comp_iterator2.getSlot(DialogueComponent));
 
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);

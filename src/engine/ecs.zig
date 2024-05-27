@@ -391,7 +391,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     return getComponentSlot(T);
                 }
 
-                inline fn getComponentSlot(comptime T: type) usize {
+                fn getComponentSlot(comptime T: type) usize {
                     inline for (0..list_data.num_of_components) |i| {
                         if (T == list_data.sorted_components[comp_sort_index][i]) {
                             return i;
