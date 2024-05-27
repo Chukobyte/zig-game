@@ -170,17 +170,21 @@ test "ecs test" {
     // Component iterator tests
     const ComponentIterator = ECSContext.ArchetypeComponentIterator;
     var comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
-    try std.testing.expectEqual(true, comp_iterator.next() != null);
-    try std.testing.expectEqual(true, comp_iterator.next() == null);
-    comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.peek() != null);
+    try std.testing.expectEqual(true, comp_iterator.next() != null);
+    try std.testing.expectEqual(true, comp_iterator.peek() == null);
+    try std.testing.expectEqual(true, comp_iterator.next() == null);
+
+    comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(0, comp_iterator.getSlot(DialogueComponent));
     try std.testing.expectEqual(1, comp_iterator.getSlot(TransformComponent));
     while (comp_iterator.next()) |node| {
-        const dialog_comp = node.getComponent(DialogueComponent);
-        try std.testing.expectEqualStrings("Testing things!", dialog_comp.text);
-        const trans_comp = node.getComponent(TransformComponent);
-        _ = trans_comp;
+        const iter_dialogue_comp = node.getValue(0);
+        const iter_dialogue_comp2 = node.getComponent(DialogueComponent);
+        const iter_trans_comp = node.getValue(1);
+        const iter_trans_comp2 = node.getComponent(TransformComponent);
+        try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
+        try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
     }
     // Changing order
     var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
