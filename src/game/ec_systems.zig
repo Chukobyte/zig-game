@@ -31,14 +31,6 @@ pub const SpriteRenderingSystem = struct {
             const draw_config = sprite_comp.sprite.getDrawConfig(&transform_comp.transform, 0);
             Renderer.queueDrawSprite(&draw_config);
         }
-        // for (0..context.entity_data_list.items.len) |entity| {
-        //     if (context.getComponent(entity, TransformComponent)) |transform_comp| {
-        //         if (context.getComponent(entity, SpriteComponent)) |sprite_comp| {
-        //             const draw_config = sprite_comp.sprite.getDrawConfig(&transform_comp.transform, 0);
-        //             Renderer.queueDrawSprite(&draw_config);
-        //         }
-        //     }
-        // }
     }
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent }; }
 };

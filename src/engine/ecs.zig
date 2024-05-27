@@ -266,7 +266,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
                             // No duplicates found, create new sorted comps row
                             for (0..list_data.num_of_components) |i| {
                                 list_data.sorted_components[list_data.num_of_sorted_components][i] = component_types[i];
-                                list_data.sorted_components_by_index[list_data.num_of_sorted_components][i] = i;
+                                list_data.sorted_components_by_index[list_data.num_of_sorted_components][i] = CompTypeList.getIndex(component_types[i]);
                             }
                             list_data.num_of_sorted_components += 1;
                             continue :main;
@@ -277,7 +277,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
                     archetype_list_data[archetypes_count] = ArchetypeListData{ .signature = archetype_sig, .num_of_components = component_types.len, .num_of_sorted_components = 1 };
                     for (0..component_types.len) |i| {
                         archetype_list_data[archetypes_count].sorted_components[0][i] = component_types[i];
-                        archetype_list_data[archetypes_count].sorted_components_by_index[0][i] = i;
+                        archetype_list_data[archetypes_count].sorted_components_by_index[0][i] = CompTypeList.getIndex(component_types[i]);
                     }
 
                     archetypes_count += 1;
@@ -377,7 +377,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         .archetype = &context.archetype_data_list[arch_index],
                         .components = undefined,
                     };
-                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.current_entity][comp_sort_index][0..];
+                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.current_entity][comp_sort_index][0..arch_comps.len];
                     return new_iterator;
                 }
 
