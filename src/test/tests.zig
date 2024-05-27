@@ -115,6 +115,7 @@ test "archetype test" {
     try std.testing.expectEqual(1, ArcList.getIndex(TestArchetype1));
     try std.testing.expectEqual(0, ArcList.getSortIndex(TestArchetype0));
     try std.testing.expectEqual(0, ArcList.getSortIndex(TestArchetype1));
+    try std.testing.expectEqual(0, ArcList.getSortIndex(&.{ TestComp2, TestComp0 }));
 }
 
 test "type list test" {
