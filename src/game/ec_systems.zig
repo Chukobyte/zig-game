@@ -38,24 +38,13 @@ pub const SpriteRenderingSystem = struct {
 pub const TextRenderingSystem = struct {
     pub fn render(self: *@This(), context: *ECSContext) void {
         _ = self;
-        // var comp_iter = ComponentIterator(&.{ TransformComponent, TextLabelComponent }).init(context);
-        // while (comp_iter.next()) |node| {
-        //     const transform_comp = node.getValue(0);
-        //     const text_label_comp = node.getValue(1);
-        //     if (!text_label_comp.text_label.text.isEmpty()) {
-        //         const draw_config = text_label_comp.text_label.getDrawConfig(transform_comp.transform.position, 0);
-        //         Renderer.queueDrawText(&draw_config);
-        //     }
-        // }
-
-        for (0..context.entity_data_list.items.len) |entity| {
-            if (context.getComponent(entity, TransformComponent)) |transform_comp| {
-                if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
-                    if (!text_label_comp.text_label.text.isEmpty()) {
-                        const draw_config = text_label_comp.text_label.getDrawConfig(transform_comp.transform.position, 0);
-                        Renderer.queueDrawText(&draw_config);
-                    }
-                }
+        var comp_iter = ComponentIterator(&.{ TransformComponent, TextLabelComponent }).init(context);
+        while (comp_iter.next()) |node| {
+            const transform_comp = node.getValue(0);
+            const text_label_comp = node.getValue(1);
+            if (!text_label_comp.text_label.text.isEmpty()) {
+                const draw_config = text_label_comp.text_label.getDrawConfig(transform_comp.transform.position, 0);
+                Renderer.queueDrawText(&draw_config);
             }
         }
     }

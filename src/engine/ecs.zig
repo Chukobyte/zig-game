@@ -367,24 +367,28 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     }
                 };
 
-                current_entity: Entity,
+                current_index: Entity,
                 archetype: *ArchetypeData,
+                entities: []Entity,
                 components: *[arch_comps.len]*anyopaque,
 
                 pub fn init(context: *ECSContextType) @This() {
+                    // TODO: Get starting entity from archetype and set limit accordingly
                     var new_iterator = @This(){
-                        .current_entity = 0,
+                        .current_index = 0,
                         .archetype = &context.archetype_data_list[arch_index],
+                        .entities = undefined,
                         .components = undefined,
                     };
-                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.current_entity][comp_sort_index][0..arch_comps.len];
+                    new_iterator.entities = new_iterator.archetype.entities.items[0..];
+                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.entities[0]][comp_sort_index][0..arch_comps.len];
                     return new_iterator;
                 }
 
                 pub fn next(self: *@This()) ?Node {
-                    if (self.current_entity < self.archetype.entities.items.len) {
+                    if (self.current_index < self.entities.len) {
                         const node = Node{ .iter = self };
-                        self.current_entity += 1;
+                        self.current_index += 1;
                         // TODO: Make sure current entity is valid
                         return node;
                     }
@@ -392,7 +396,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 }
 
                 pub fn peek(self: *@This()) ?Node {
-                    if (self.current_entity < self.archetype.entities.items.len) {
+                    if (self.current_index < self.entities.len) {
                         const node = Node{ .iter = self };
                         // TODO: Make sure current entity is valid
                         return node;
