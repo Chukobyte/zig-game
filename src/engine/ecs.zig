@@ -225,7 +225,8 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
             signature: usize,
             num_of_components: usize,
             num_of_sorted_components: usize = 0,
-            sorted_components: [sorted_components_max][components_max] type = undefined,
+            sorted_components: [sorted_components_max][components_max]type = undefined,
+            sorted_components_by_index: [sorted_components_max][components_max]usize = undefined,
         };
 
         inline fn generateArchetypeListData() []ArchetypeListData {
@@ -260,6 +261,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
                             // No duplicates found, create new sorted comps row
                             for (0..list_data.num_of_sorted_components) |i| {
                                 list_data.sorted_components[list_data.num_of_sorted_components][i] = component_types[i];
+                                list_data.sorted_components_by_index[list_data.num_of_sorted_components][i] = i;
                             }
                             list_data.num_of_sorted_components += 1;
                             continue :main;
@@ -270,6 +272,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
                     archetype_list_data[archetypes_count] = ArchetypeListData{ .signature = archetype_sig, .num_of_components = component_types.len, .num_of_sorted_components = 1 };
                     for (0..component_types.len) |i| {
                         archetype_list_data[archetypes_count].sorted_components[0][i] = component_types[i];
+                        archetype_list_data[archetypes_count].sorted_components_by_index[0][i] = i;
                     }
 
                     archetypes_count += 1;
@@ -329,6 +332,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         const ArchetypeData = struct {
             sorted_components: std.ArrayList([sorted_components_max][component_types.len]*anyopaque) = undefined,
             entities: std.ArrayList(Entity) = undefined,
+            sorted_components_by_index: [sorted_components_max][component_types.len]usize = undefined,
             systems: [system_types.len]usize = undefined, // System indices
             system_count: usize = 0,
             signature: usize = 0,
@@ -427,6 +431,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const data_list = &new_context.archetype_data_list[i];
                 data_list.entities = std.ArrayList(Entity).init(allocator);
                 data_list.sorted_components = std.ArrayList([sorted_components_max][component_types.len]*anyopaque).init(allocator);
+                for (0..arch_data.num_of_sorted_components) |comp_sort_i| {
+                    for (0..arch_data.num_of_components) |comp_i| {
+                        data_list.sorted_components_by_index[comp_sort_i][comp_i] = arch_data.sorted_components_by_index[comp_sort_i][comp_i];
+                    }
+                }
                 data_list.signature = arch_data.signature;
                 data_list.num_of_components = arch_data.num_of_components;
                 data_list.num_of_sorted_components = arch_data.num_of_sorted_components;
@@ -734,8 +743,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     inline for (0..arch_list_data[i].num_of_sorted_components) |sort_comp_i| {
                         inline for (0..arch_list_data[i].num_of_components) |comp_i| {
                             // Map component pointers with order
-                            const CompT: type = arch_list_data[i].sorted_components[sort_comp_i][comp_i];
-                            const entity_comp_index = component_type_list.getIndex(CompT);
+                            const entity_comp_index = data_list.sorted_components_by_index[sort_comp_i][comp_i];
                             data_list.sorted_components.items[entity][sort_comp_i][comp_i] = entity_data.components[entity_comp_index].?;
                             if (comp_i + 1 >= data_list.num_of_components)  {
                                 break;

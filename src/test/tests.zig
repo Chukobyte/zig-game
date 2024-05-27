@@ -82,7 +82,7 @@ const TestECSystem = struct {
 };
 
 const TestECSystem2 = struct {
-    // pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
+    pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
 };
 
 test "archetype test" {
@@ -180,7 +180,7 @@ test "ecs test" {
         const trans_comp = node.getComponent(TransformComponent);
         _ = trans_comp;
     }
-    // Changing order - TODO: Fix
+    // Changing order - TODO: fix
     // comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
     // try std.testing.expectEqual(0, comp_iterator.getSlot(TransformComponent));
     // try std.testing.expectEqual(1, comp_iterator.getSlot(DialogueComponent));
