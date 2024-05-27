@@ -183,9 +183,9 @@ test "ecs test" {
         _ = trans_comp;
     }
     // Changing order - TODO: fix
-    // var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
-    // try std.testing.expectEqual(0, comp_iterator2.getSlot(TransformComponent));
-    // try std.testing.expectEqual(1, comp_iterator2.getSlot(DialogueComponent));
+    var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
+    try std.testing.expectEqual(0, comp_iterator2.getSlot(TransformComponent));
+    try std.testing.expectEqual(1, comp_iterator2.getSlot(DialogueComponent));
 
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);
