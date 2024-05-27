@@ -186,6 +186,11 @@ test "ecs test" {
     var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
     try std.testing.expectEqual(0, comp_iterator2.getSlot(TransformComponent));
     try std.testing.expectEqual(1, comp_iterator2.getSlot(DialogueComponent));
+    while (comp_iterator2.next()) |node| {
+        const iter_trans_comp = node.getValue(0);
+        const iter_trans_comp2 = node.getComponent(TransformComponent);
+        try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
+    }
 
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);

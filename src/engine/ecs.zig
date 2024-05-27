@@ -359,6 +359,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     pub fn getComponent(self: *const @This(), comptime T: type) *T {
                         return @alignCast(@ptrCast(self.components[getComponentSlot(T)]));
                     }
+
+                    pub fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
+                        return @alignCast(@ptrCast(self.components[slot]));
+                    }
                 };
 
                 current_entity: Entity,
