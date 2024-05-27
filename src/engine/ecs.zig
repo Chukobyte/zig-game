@@ -191,13 +191,18 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
             const arch_index = getIndex(component_types);
             const archetype_list_data: []ArchetypeListData = generateArchetypeListData();
             const list_data = &archetype_list_data[arch_index];
-            for (0..list_data.num_of_sorted_components) |i| {
-                for (0..list_data.num_of_components) |comp_i| {
-                    if (comp_types[comp_i] != list_data.sorted_components[i][comp_i]) {
+            const num_of_sorted_components = list_data.num_of_sorted_components;
+            const num_of_components = list_data.num_of_components;
+            inline for (0..num_of_sorted_components) |i| {
+                inline for (0..num_of_components) |comp_i| {
+                    if (component_types[comp_i] != list_data.sorted_components[i][comp_i]) {
                         break;
+                    } else {
+                        if (comp_i <= num_of_components - 1) {
+                            return i;
+                        }
                     }
                 }
-                return i;
             }
             @compileError("Didn't pass in valid component types for sort index!");
         }
