@@ -172,7 +172,7 @@ test "ecs test" {
     var comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.next() != null);
     try std.testing.expectEqual(true, comp_iterator.next() == null);
-    comp_iterator = ECSContext.ArchetypeComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
+    comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(true, comp_iterator.peek() != null);
     try std.testing.expectEqual(0, comp_iterator.getSlot(DialogueComponent));
     try std.testing.expectEqual(1, comp_iterator.getSlot(TransformComponent));
@@ -189,7 +189,10 @@ test "ecs test" {
     while (comp_iterator2.next()) |node| {
         const iter_trans_comp = node.getValue(0);
         const iter_trans_comp2 = node.getComponent(TransformComponent);
+        const iter_dialogue_comp = node.getValue(1);
+        const iter_dialogue_comp2 = node.getComponent(DialogueComponent);
         try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
+        try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
     }
 
     // Test entity interface
