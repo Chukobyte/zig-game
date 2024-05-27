@@ -353,32 +353,37 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
             return struct {
 
+                const IteratorT = @This();
+
                 pub const Node = struct {
-                    components: *[list_data.num_of_components]*anyopaque,
+                    iter: *IteratorT,
 
                     pub fn getComponent(self: *const @This(), comptime T: type) *T {
-                        return @alignCast(@ptrCast(self.components[getComponentSlot(T)]));
+                        return @alignCast(@ptrCast(self.iter.components[getComponentSlot(T)]));
                     }
 
                     pub fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
-                        return @alignCast(@ptrCast(self.components[slot]));
+                        return @alignCast(@ptrCast(self.iter.components[slot]));
                     }
                 };
 
                 current_entity: Entity,
                 archetype: *ArchetypeData,
+                components: *[arch_comps.len]*anyopaque,
 
                 pub fn init(context: *ECSContextType) @This() {
-                    const new_iterator = @This(){
+                    var new_iterator = @This(){
                         .current_entity = 0,
                         .archetype = &context.archetype_data_list[arch_index],
+                        .components = undefined,
                     };
+                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.current_entity][comp_sort_index][0..];
                     return new_iterator;
                 }
 
                 pub fn next(self: *@This()) ?Node {
                     if (self.current_entity < self.archetype.entities.items.len) {
-                        const node = Node{ .components = self.archetype.sorted_components.items[self.current_entity][comp_sort_index][0..] };
+                        const node = Node{ .iter = self };
                         self.current_entity += 1;
                         // TODO: Make sure current entity is valid
                         return node;
@@ -388,7 +393,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
                 pub fn peek(self: *@This()) ?Node {
                     if (self.current_entity < self.archetype.entities.items.len) {
-                        const node = Node{ .components = self.archetype.sorted_components.items[self.current_entity][comp_sort_index][0..] };
+                        const node = Node{ .iter = self };
                         // TODO: Make sure current entity is valid
                         return node;
                     }

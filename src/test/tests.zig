@@ -236,6 +236,65 @@ test "ecs test" {
     try std.testing.expectEqual(true, TestECSystem.has_called_entity_unregistered);
 }
 
+test "ecs perf test" {
+    const entities_to_test = 100000;
+
+    const TestComp0 = struct { size: usize = 0, };
+    const TestComp1 = struct { size: usize = 0, };
+    const TestComp2 = struct { size: usize = 0, };
+
+    const TestSystem0 = struct { pub fn getArchetype() []const type { return &.{ TestComp0, TestComp1, TestComp2 }; } };
+    const TestSystem1 = struct { pub fn getArchetype() []const type { return &.{ TestComp2, TestComp1, TestComp0 }; } };
+    const TestSystem2 = struct { pub fn getArchetype() []const type { return &.{ TestComp1, TestComp2, TestComp0 }; } };
+
+    const Context = ecs.ECSContext(.{
+        .entity_type = usize,
+        .components = &.{ TestComp0, TestComp1, TestComp2 },
+        .systems = &.{ TestSystem0, TestSystem1, TestSystem2 },
+    });
+    var context = try Context.init(std.testing.allocator);
+    defer context.deinit();
+
+    for (0..entities_to_test) |i| {
+        _ = i;
+        const new_entity = try context.initEntity(.{});
+        try context.setComponent(new_entity, TestComp0, &.{});
+        try context.setComponent(new_entity, TestComp1, &.{});
+        try context.setComponent(new_entity, TestComp2, &.{});
+    }
+
+    var timer = try std.time.Timer.start();
+
+    for (0..entities_to_test) |entity| {
+        _ = context.getComponent(entity, TestComp0);
+        _ = context.getComponent(entity, TestComp1);
+        _ = context.getComponent(entity, TestComp2);
+    }
+
+    std.debug.print("normal get duration: {d}ns\n", .{timer.lap()});
+
+    const ComponentIterator = Context.ArchetypeComponentIterator;
+    var comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
+
+    while (comp_iterator.next()) |node| {
+        _ = node.getValue(0);
+        _ = node.getValue(1);
+        _ = node.getValue(2);
+    }
+
+    std.debug.print("iterator get duration: {d}ns\n", .{timer.lap()});
+
+    comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
+
+    while (comp_iterator.next()) |node| {
+        _ = node.getValue(2);
+        _ = node.getValue(1);
+        _ = node.getValue(0);
+    }
+
+    std.debug.print("iterator out of order get duration: {d}ns\n", .{timer.lap()});
+}
+
 test "tag list test" {
     const Tags = ecs.TagList(2);
     const tag_list = Tags.initFromSlice(&.{ "test", "okay" });
