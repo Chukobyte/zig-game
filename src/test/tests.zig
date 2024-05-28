@@ -178,11 +178,11 @@ test "ecs test" {
     comp_iterator = ComponentIterator(&.{ DialogueComponent, TransformComponent }).init(&ecs_context);
     try std.testing.expectEqual(0, comp_iterator.getSlot(DialogueComponent));
     try std.testing.expectEqual(1, comp_iterator.getSlot(TransformComponent));
-    while (comp_iterator.next()) |node| {
-        const iter_dialogue_comp = node.getValue(0);
-        const iter_dialogue_comp2 = node.getComponent(DialogueComponent);
-        const iter_trans_comp = node.getValue(1);
-        const iter_trans_comp2 = node.getComponent(TransformComponent);
+    while (comp_iterator.next()) |iter| {
+        const iter_dialogue_comp = iter.getValue(0);
+        const iter_dialogue_comp2 = iter.getComponent(DialogueComponent);
+        const iter_trans_comp = iter.getValue(1);
+        const iter_trans_comp2 = iter.getComponent(TransformComponent);
         try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
         try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
     }
@@ -190,14 +190,14 @@ test "ecs test" {
     var comp_iterator2 = ComponentIterator(&.{ TransformComponent, DialogueComponent }).init(&ecs_context);
     try std.testing.expectEqual(0, comp_iterator2.getSlot(TransformComponent));
     try std.testing.expectEqual(1, comp_iterator2.getSlot(DialogueComponent));
-    while (comp_iterator2.next()) |node| {
-        const iter_trans_comp = node.getValue(0);
-        const iter_trans_comp2 = node.getComponent(TransformComponent);
-        const iter_dialogue_comp = node.getValue(1);
-        const iter_dialogue_comp2 = node.getComponent(DialogueComponent);
+    while (comp_iterator2.next()) |iter| {
+        const iter_trans_comp = iter.getValue(0);
+        const iter_trans_comp2 = iter.getComponent(TransformComponent);
+        const iter_dialogue_comp = iter.getValue(1);
+        const iter_dialogue_comp2 = iter.getComponent(DialogueComponent);
         try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
         try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
-        try std.testing.expectEqual(0, node.getEntity());
+        try std.testing.expectEqual(0, iter.getEntity());
     }
 
     // Test entity interface
@@ -239,6 +239,13 @@ test "ecs test" {
 
 test "ecs perf test" {
     const entities_to_test = 100_000;
+    const test_iterations = 10;
+
+    const TestReport = struct {
+        accumalated_normal: u64 = 0,
+        accumalated_iter_ordered: u64 = 0,
+        accumalated_iter_unordered: u64 = 0,
+    };
 
     const TestComp0 = struct { size: usize = 0, };
     const TestComp1 = struct { size: usize = 0, };
@@ -253,6 +260,10 @@ test "ecs perf test" {
         .components = &.{ TestComp0, TestComp1, TestComp2 },
         .systems = &.{ TestSystem0, TestSystem1, TestSystem2 },
     });
+    const ComponentIterator = Context.ArchetypeComponentIterator;
+
+    var report = TestReport{};
+
     var context = try Context.init(std.testing.allocator);
     defer context.deinit();
 
@@ -264,36 +275,69 @@ test "ecs perf test" {
         try context.setComponent(new_entity, TestComp2, &.{});
     }
 
-    var timer = try std.time.Timer.start();
+    std.debug.print("=====================================================\n", .{});
+    std.debug.print("Starting testing ecs perf with '{d}' entities with {d} test iterations\n", .{ entities_to_test, test_iterations });
 
-    for (0..entities_to_test) |entity| {
-        _ = context.getComponent(entity, TestComp0);
-        _ = context.getComponent(entity, TestComp1);
-        _ = context.getComponent(entity, TestComp2);
+    for (0..test_iterations) |i| {
+        std.debug.print("=====================================================\n", .{});
+        std.debug.print("Test Iteration {d}\n\n", .{ i });
+
+        var timer = try std.time.Timer.start();
+
+        // Normal get duration
+        {
+            defer timer.reset();
+            for (0..entities_to_test) |entity| {
+                _ = context.getComponent(entity, TestComp0);
+                _ = context.getComponent(entity, TestComp1);
+                _ = context.getComponent(entity, TestComp2);
+            }
+
+            const normal_get_duration = timer.read();
+            report.accumalated_normal += normal_get_duration;
+            std.debug.print("normal get duration: {d}ns\n", .{ normal_get_duration });
+        }
+
+        // Iter ordered get duration
+        {
+            defer timer.reset();
+            var comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
+
+            while (comp_iterator.next()) |iter| {
+                _ = iter.getValue(0);
+                _ = iter.getValue(1);
+                _ = iter.getValue(2);
+            }
+
+            const iter_ordered_get_duration = timer.read();
+            report.accumalated_iter_ordered += iter_ordered_get_duration;
+            std.debug.print("iterator get duration: {d}ns\n", .{ iter_ordered_get_duration });
+        }
+
+        // Iter unordered get duration
+        {
+            defer timer.reset();
+            var comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
+
+            while (comp_iterator.next()) |iter| {
+                _ = iter.getValue(2);
+                _ = iter.getValue(1);
+                _ = iter.getValue(0);
+            }
+            const iter_unordered_get_duration = timer.read();
+            report.accumalated_iter_unordered += iter_unordered_get_duration;
+            std.debug.print("iterator unordered get duration: {d}ns\n", .{ iter_unordered_get_duration });
+        }
+
+
+        std.debug.print("=====================================================\n", .{});
     }
 
-    std.debug.print("normal get duration: {d}ns\n", .{timer.lap()});
-
-    const ComponentIterator = Context.ArchetypeComponentIterator;
-    var comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
-
-    while (comp_iterator.next()) |node| {
-        _ = node.getValue(0);
-        _ = node.getValue(1);
-        _ = node.getValue(2);
-    }
-
-    std.debug.print("iterator get duration: {d}ns\n", .{timer.lap()});
-
-    comp_iterator = ComponentIterator(&.{ TestComp0, TestComp1, TestComp2 }).init(&context);
-
-    while (comp_iterator.next()) |node| {
-        _ = node.getValue(2);
-        _ = node.getValue(1);
-        _ = node.getValue(0);
-    }
-
-    std.debug.print("iterator out of order get duration: {d}ns\n", .{timer.lap()});
+    std.debug.print("Averaged Results\n\n", .{});
+    std.debug.print("average normal get duration: {d}ns\n", .{ report.accumalated_normal / test_iterations });
+    std.debug.print("average iterator get duration: {d}ns\n", .{ report.accumalated_iter_ordered / test_iterations });
+    std.debug.print("average iterator unordered get duration: {d}ns\n", .{ report.accumalated_iter_unordered / test_iterations });
+    std.debug.print("=====================================================\n", .{});
 }
 
 test "tag list test" {

@@ -353,30 +353,12 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
             return struct {
 
-                const IteratorT = @This();
-
-                pub const Node = struct {
-                    iter: *IteratorT,
-
-                    pub inline fn getComponent(self: *const @This(), comptime T: type) *T {
-                        return @alignCast(@ptrCast(self.iter.components[getComponentSlot(T)]));
-                    }
-
-                    pub inline fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
-                        return @alignCast(@ptrCast(self.iter.components[slot]));
-                    }
-
-                    pub inline fn getEntity(self: *const @This()) Entity {
-                        return self.iter.entities[self.iter.current_index - 1];
-                    }
-                };
-
                 current_index: usize,
                 archetype: *ArchetypeData,
                 entities: []Entity,
                 components: *[arch_comps.len]*anyopaque,
 
-                pub fn init(context: *ECSContextType) @This() {
+                pub inline fn init(context: *ECSContextType) @This() {
                     var new_iterator = @This(){
                         .current_index = 0,
                         .archetype = &context.archetype_data_list[arch_index],
@@ -390,22 +372,18 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     return new_iterator;
                 }
 
-                pub fn next(self: *@This()) ?Node {
+                pub fn next(self: *@This()) ?*const @This() {
                     if (self.isValid()) {
-                        const node = Node{ .iter = self };
                         self.components = self.archetype.sorted_components.items[self.entities[self.current_index]][comp_sort_index][0..arch_comps.len];
                         self.current_index += 1;
-                        // TODO: Make sure current entity is valid
-                        return node;
+                        return self;
                     }
                     return null;
                 }
 
-                pub fn peek(self: *@This()) ?Node {
+                pub fn peek(self: *@This()) ?*@This() {
                     if (self.isValid()) {
-                        const node = Node{ .iter = self };
-                        // TODO: Make sure current entity is valid
-                        return node;
+                        return self;
                     }
                     return null;
                 }
@@ -426,6 +404,18 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         }
                     }
                     @compileError("Comp isn't in iterator!");
+                }
+
+                pub inline fn getComponent(self: *const @This(), comptime T: type) *T {
+                    return @alignCast(@ptrCast(self.components[getComponentSlot(T)]));
+                }
+
+                pub inline fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
+                    return @alignCast(@ptrCast(self.components[slot]));
+                }
+
+                pub inline fn getEntity(self: *const @This()) Entity {
+                    return self.entities[self.current_index - 1];
                 }
             };
         }
