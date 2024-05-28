@@ -197,6 +197,7 @@ test "ecs test" {
         const iter_dialogue_comp2 = node.getComponent(DialogueComponent);
         try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
         try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
+        try std.testing.expectEqual(0, node.getEntity());
     }
 
     // Test entity interface

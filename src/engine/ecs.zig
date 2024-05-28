@@ -365,6 +365,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     pub fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
                         return @alignCast(@ptrCast(self.iter.components[slot]));
                     }
+
+                    pub fn getEntity(self: *const @This()) ?Entity {
+                        if (self.iter.current_index >= 0 and self.iter.current_index <= self.iter.entities.len) {
+                            return self.iter.entities[self.iter.current_index - 1];
+                        }
+                        return 0;
+                    }
                 };
 
                 current_index: usize,
@@ -380,12 +387,14 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         .components = undefined,
                     };
                     new_iterator.entities = new_iterator.archetype.entities.items[0..];
-                    new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.entities[0]][comp_sort_index][0..arch_comps.len];
+                    if (new_iterator.entities.len != 0) {
+                        new_iterator.components = new_iterator.archetype.sorted_components.items[new_iterator.entities[0]][comp_sort_index][0..arch_comps.len];
+                    }
                     return new_iterator;
                 }
 
                 pub fn next(self: *@This()) ?Node {
-                    if (self.current_index < self.entities.len) {
+                    if (self.isValid()) {
                         const node = Node{ .iter = self };
                         self.components = self.archetype.sorted_components.items[self.entities[self.current_index]][comp_sort_index][0..arch_comps.len];
                         self.current_index += 1;
@@ -396,12 +405,16 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 }
 
                 pub fn peek(self: *@This()) ?Node {
-                    if (self.current_index < self.entities.len) {
+                    if (self.isValid()) {
                         const node = Node{ .iter = self };
                         // TODO: Make sure current entity is valid
                         return node;
                     }
                     return null;
+                }
+
+                pub inline fn isValid(self: *const @This()) bool {
+                    return self.current_index < self.entities.len;
                 }
 
                 pub inline fn getSlot(self: *const @This(), comptime T: type) usize {
