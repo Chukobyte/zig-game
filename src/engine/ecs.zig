@@ -358,19 +358,16 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 pub const Node = struct {
                     iter: *IteratorT,
 
-                    pub fn getComponent(self: *const @This(), comptime T: type) *T {
+                    pub inline fn getComponent(self: *const @This(), comptime T: type) *T {
                         return @alignCast(@ptrCast(self.iter.components[getComponentSlot(T)]));
                     }
 
-                    pub fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
+                    pub inline fn getValue(self: *const @This(), slot: comptime_int) *arch_comps[slot] {
                         return @alignCast(@ptrCast(self.iter.components[slot]));
                     }
 
-                    pub fn getEntity(self: *const @This()) ?Entity {
-                        if (self.iter.current_index >= 0 and self.iter.current_index <= self.iter.entities.len) {
-                            return self.iter.entities[self.iter.current_index - 1];
-                        }
-                        return 0;
+                    pub inline fn getEntity(self: *const @This()) Entity {
+                        return self.iter.entities[self.iter.current_index - 1];
                     }
                 };
 
