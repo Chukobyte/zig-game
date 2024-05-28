@@ -237,7 +237,7 @@ test "ecs test" {
 }
 
 test "ecs perf test" {
-    const entities_to_test = 100000;
+    const entities_to_test = 100_000;
 
     const TestComp0 = struct { size: usize = 0, };
     const TestComp1 = struct { size: usize = 0, };
