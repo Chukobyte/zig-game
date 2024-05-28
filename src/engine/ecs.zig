@@ -367,13 +367,12 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     }
                 };
 
-                current_index: Entity,
+                current_index: usize,
                 archetype: *ArchetypeData,
                 entities: []Entity,
                 components: *[arch_comps.len]*anyopaque,
 
                 pub fn init(context: *ECSContextType) @This() {
-                    // TODO: Get starting entity from archetype and set limit accordingly
                     var new_iterator = @This(){
                         .current_index = 0,
                         .archetype = &context.archetype_data_list[arch_index],
@@ -388,6 +387,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 pub fn next(self: *@This()) ?Node {
                     if (self.current_index < self.entities.len) {
                         const node = Node{ .iter = self };
+                        self.components = self.archetype.sorted_components.items[self.entities[self.current_index]][comp_sort_index][0..arch_comps.len];
                         self.current_index += 1;
                         // TODO: Make sure current entity is valid
                         return node;
