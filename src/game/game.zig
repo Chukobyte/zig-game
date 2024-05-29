@@ -109,15 +109,16 @@ pub fn run() !void {
             });
             try self.ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
 
-            // const text_label_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
-            // try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
-            // const text_label = try TextLabel.String.initAndSet(self.allocator, "Money: 0", .{});
-            // try self.ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
-            //     .font = self.font, .text = text_label, .color = Color.Red }
-            // });
+            const text_label_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
+            try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
+            try self.ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
+                .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
+            });
+            if (self.ecs_context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
+                try text_label_comp.text_label.text.set("Money: 0", .{});
+            }
         }
     };
-
 
     const allocator = std.heap.page_allocator;
 
@@ -129,12 +130,6 @@ pub fn run() !void {
     var scene = try Scene.init(allocator, &ecs_context);
     defer scene.deinit();
     try scene.setupInitialScene();
-
-    const text_label_entity = try ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
-    try ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
-    try ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
-        .font = scene.font, .text = try TextLabel.String.initAndSet(allocator, "Money: 0", .{}), .color = Color.Red }
-    });
 
     while (isGameRunning()) {
         zeika.update();
