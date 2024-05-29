@@ -707,7 +707,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         const current_comp: *T = @alignCast(@ptrCast(component));
                         self.allocator.destroy(current_comp);
                         entity_data.components[i] = null;
-                        entity_data.is_valid = false;
                     }
                 }
                 entity_data.tag_list = .{};
