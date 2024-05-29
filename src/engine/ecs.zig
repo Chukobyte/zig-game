@@ -2,6 +2,40 @@
 
 const std = @import("std");
 
+// TODO: Move some of this stuff out of ecs
+
+const ArrayListUtils = struct {
+    pub fn findIndexByValue(comptime T: type, list: *std.ArrayList(T), value: *const T) ?usize {
+        for (list.items, 0..list.items.len) |*item, i| {
+            if (item == value) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    pub fn findIndexByPred(comptime T: type, list: *std.ArrayList(T), value: *const T, pred: *const fn(*const T, *const T) bool) ?usize {
+        for (list.items, 0..list.items.len) |*item, i| {
+            if (pred(value, item)) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    pub fn removeByValue(comptime T: type, list: *std.ArrayList(T), value: *const T) void {
+        if (findIndexByValue(T, list, value)) |i| {
+            _ = list.swapRemove(i);
+        }
+    }
+
+    pub fn removeByPred(comptime T: type, list: *std.ArrayList(T), value: *const T, pred: *const fn(*const T, *const T) bool) void {
+        if (findIndexByPred(T, list, value, pred)) |i| {
+            _ = list.swapRemove(i);
+        }
+    }
+};
+
 pub fn TagList(max_tags: comptime_int) type {
     return struct {
         tags: [max_tags][]const u8 = undefined,
@@ -327,6 +361,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             is_in_archetype_map: [archetype_count]bool = undefined,
         };
 
+        /// Instance data for user defined mapping of entity instance types to entities used for ticking
+        const InterfaceTickData = struct {
+            interface_id: usize,
+            entity: Entity,
+            instance: *anyopaque,
+        };
+
         /// System related stuff
         pub const ECSystemData = struct {
             interface_instance: *anyopaque,
@@ -431,6 +472,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         entity_data_list: std.ArrayList(EntityData),
         system_data_list: std.ArrayList(ECSystemData),
         archetype_data_list: [archetype_count]ArchetypeData,
+        entity_interface_tick_data_list: std.ArrayList(InterfaceTickData),
         entity_id_counter: Entity = @as(Entity, 0),
 
         pub fn init(allocator: std.mem.Allocator) !@This() {
@@ -439,6 +481,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .entity_data_list = std.ArrayList(EntityData).init(allocator),
                 .system_data_list = try std.ArrayList(ECSystemData).initCapacity(allocator, system_type_list.len),
                 .archetype_data_list = undefined,
+                .entity_interface_tick_data_list = std.ArrayList(InterfaceTickData).init(allocator),
             };
 
             const arch_list_data = comptime archetype_list.generateArchetypeListData();
@@ -513,6 +556,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 data_list.sorted_components.deinit();
                 data_list.* = .{};
             }
+
+            self.entity_interface_tick_data_list.deinit();
         }
 
         pub fn tick(self: *@This()) void {
@@ -526,15 +571,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
 
             // Tick entities
-            for (self.entity_data_list.items, 0..self.entity_data_list.items.len) |*entity_data, entity| {
-                if (entity_data.interface_instance) |interface_instance| {
-                    inline for (0..entity_interface_types.len) |i| {
-                        const T: type = entity_interface_type_list.getType(i);
-                        if (T == entity_interface_types[i]) {
-                            if (@hasDecl(T, "tick")) {
-                                const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
-                                interface_ptr.tick(self, entity);
-                            }
+            for (self.entity_interface_tick_data_list.items) |*entity_tick_data| {
+                inline for (0..entity_interface_types.len) |i| {
+                    const T: type = entity_interface_type_list.getType(i);
+                    if (T == entity_interface_types[i]) {
+                        if (i == entity_tick_data.interface_id) {
+                            const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
+                            interface_ptr.tick(self, entity_tick_data.entity);
                         }
                     }
                 }
@@ -610,6 +653,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     new_interface.init(self, new_entity);
                 }
                 entity_data.interface_instance = new_interface;
+
+                if (@hasDecl(T, "tick")) {
+                    try self.entity_interface_tick_data_list.append(InterfaceTickData{ .interface_id = entity_interface_type_list.getIndex(T), .entity = new_entity, .instance = new_interface });
+                }
             } else {
                 entity_data.interface_instance = null;
             }
@@ -637,6 +684,14 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
                         if (entity_data.interface_instance) |interface_instance| {
+                            if (@hasDecl(T, "tick")) {
+                                ArrayListUtils.removeByPred(InterfaceTickData, &self.entity_interface_tick_data_list, &InterfaceTickData{ .interface_id = i, .instance = undefined, .entity = entity }, struct {
+                                    pub fn find(original: *const InterfaceTickData, value: *const InterfaceTickData) bool {
+                                        return original.entity == value.entity;
+                                    }
+                                }.find);
+                            }
+
                             const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "deinit")) {
                                 interface_ptr.deinit(self, entity);
