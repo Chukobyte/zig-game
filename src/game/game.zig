@@ -69,38 +69,71 @@ pub fn deinit() void {
 }
 
 pub fn run() !void {
-    is_game_running = true;
+    // Acts as a temp in place struct for where init, setup, and deinit will be done at a scene level
+    const Scene = struct {
+        allocator: std.mem.Allocator,
+        ecs_context: *ECSContext,
+        texture_handle: Texture.Handle,
+        font: Font,
+
+        pub fn init(allocator: std.mem.Allocator, ecs_context: *ECSContext) !@This() {
+            const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
+            const default_font: Font = Font.initFromMemory(
+                assets.DefaultFont.data,
+                assets.DefaultFont.len,
+                .{ .font_size = 16, .apply_nearest_neighbor = true }
+            );
+            return @This(){
+                .allocator = allocator,
+                .ecs_context = ecs_context,
+                .texture_handle = texture_handle,
+                .font = default_font,
+            };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            Texture.deinit(self.texture_handle);
+            self.font.deinit();
+        }
+
+        pub fn setupInitialScene(self: *@This()) !void {
+            const sprite_button_entity = try self.ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
+            try self.ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
+            try self.ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
+                .sprite = .{
+                    .texture = self.texture_handle,
+                    .size = .{ .x = 64.0, .y = 64.0 },
+                    .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                    .modulate = Color.Blue
+                },
+            });
+            try self.ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
+
+            // const text_label_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
+            // try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
+            // const text_label = try TextLabel.String.initAndSet(self.allocator, "Money: 0", .{});
+            // try self.ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
+            //     .font = self.font, .text = text_label, .color = Color.Red }
+            // });
+        }
+    };
+
+
     const allocator = std.heap.page_allocator;
 
     var ecs_context = try ECSContext.init(allocator);
     defer ecs_context.deinit();
 
-    const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
-    defer Texture.deinit(texture_handle);
+    is_game_running = true;
 
-    const default_font: Font = Font.initFromMemory(
-        assets.DefaultFont.data,
-        assets.DefaultFont.len,
-        .{ .font_size = 16, .apply_nearest_neighbor = true }
-    );
-    defer default_font.deinit();
-
-    const sprite_button_entity = try ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
-    try ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
-    try ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
-        .sprite = .{
-            .texture = texture_handle,
-            .size = .{ .x = 64.0, .y = 64.0 },
-            .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-            .modulate = Color.Blue
-        },
-    });
-    try ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
+    var scene = try Scene.init(allocator, &ecs_context);
+    defer scene.deinit();
+    try scene.setupInitialScene();
 
     const text_label_entity = try ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
     try ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
     try ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
-        .font = default_font, .text = try TextLabel.String.initAndSet(allocator, "Money: 0", .{}), .color = Color.Red }
+        .font = scene.font, .text = try TextLabel.String.initAndSet(allocator, "Money: 0", .{}), .color = Color.Red }
     });
 
     while (isGameRunning()) {
