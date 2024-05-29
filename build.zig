@@ -45,17 +45,32 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_exe.step);
 
     // Test
-    const test_exe = b.addTest(.{
-        .root_source_file = .{ .path = "src/test/tests.zig" },
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    test_exe.root_module.addImport("zeika", zeika_module);
-    test_exe.root_module.addImport("engine", engine_module);
-    test_exe.root_module.addImport("game", game_module);
-    const run_test = b.addRunArtifact(test_exe);
-    run_test.has_side_effects = true;
-    const test_step = b.step("test", "Run tests for the game");
-    test_step.dependOn(&run_test.step);
+    const TestDefinition = struct {
+        name: []const u8,
+        file_path: []const u8,
+        description: []const u8,
+    };
+
+    const test_defs: [2]TestDefinition = .{
+        .{ .name = "test", .description = "Run unit tests for the game", .file_path = "src/test/unit.zig" },
+        .{ .name = "perf-test", .description = "Run perf tests for the game", .file_path = "src/test/perf.zig" },
+    };
+
+    for (test_defs) |def| {
+        const test_exe = b.addTest(.{
+            .root_source_file = .{ .path = def.file_path },
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        test_exe.root_module.addImport("zeika", zeika_module);
+        test_exe.root_module.addImport("engine", engine_module);
+        test_exe.root_module.addImport("game", game_module);
+
+        const run_test = b.addRunArtifact(test_exe);
+        run_test.has_side_effects = true;
+
+        const test_step = b.step(def.name, def.description);
+        test_step.dependOn(&run_test.step);
+    }
 }
