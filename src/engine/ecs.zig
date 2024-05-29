@@ -171,7 +171,7 @@ fn TypeBitMask(comptime types: []const type) type {
     };
 }
 
-pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type {
+pub fn ArchetypeList(arch_defining_types: []const type, comp_types: []const type) type {
     const CompTypeList = TypeList(comp_types);
     return struct {
 
@@ -238,7 +238,7 @@ pub fn ArchetypeList(system_types: []const type, comp_types: []const type) type 
             var archetypes_count: usize = 0;
             var archetype_list_data: [comp_types.len * comp_types.len]ArchetypeListData = undefined;
 
-            main: for (system_types) |T| {
+            main: for (arch_defining_types) |T| {
                 if (@hasDecl(T, "getArchetype")) {
                     const component_types = T.getArchetype();
                     const archetype_sig = CompTypeList.getFlags(component_types);
@@ -306,11 +306,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
     const component_type_list = TypeList(component_types);
     const entity_interface_type_list = TypeList(entity_interface_types);
     const system_type_list = TypeList(system_types);
-    const archetype_list = ArchetypeList(system_types, component_types);
+    const archetype_list = ArchetypeList(system_types ++ entity_interface_types, component_types);
     const archetype_count = archetype_list.getArchetypeCount();
     const sorted_components_max = archetype_list.getSortedComponentsMax();
 
-    const arch_list = ArchetypeList(system_types, component_types);
 
     return struct {
         const ECSContextType = @This();
@@ -348,7 +347,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub fn ArchetypeComponentIterator(arch_comps: []const type) type {
             const comp_sort_index = archetype_list.getSortIndex(arch_comps);
             const arch_index = archetype_list.getIndex(arch_comps);
-            const arch_list_data = arch_list.generateArchetypeListData();
+            const arch_list_data = archetype_list.generateArchetypeListData();
             const list_data = arch_list_data[arch_index];
 
             return struct {
@@ -442,7 +441,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .archetype_data_list = undefined,
             };
 
-            const arch_list_data = comptime arch_list.generateArchetypeListData();
+            const arch_list_data = comptime archetype_list.generateArchetypeListData();
 
             inline for (0..archetype_count) |i| {
                 const arch_data = &arch_list_data[i];
@@ -746,7 +745,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
 
-            const arch_list_data = comptime arch_list.generateArchetypeListData();
+            const arch_list_data = comptime archetype_list.generateArchetypeListData();
 
             inline for (0..archetype_count) |i| {
                 const data_list = &self.archetype_data_list[i];
