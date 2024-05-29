@@ -473,6 +473,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         system_data_list: std.ArrayList(ECSystemData),
         archetype_data_list: [archetype_count]ArchetypeData,
         entity_interface_tick_data_list: std.ArrayList(InterfaceTickData),
+        entities_queued_for_deletion: std.ArrayList(Entity),
         entity_id_counter: Entity = @as(Entity, 0),
 
         pub fn init(allocator: std.mem.Allocator) !@This() {
@@ -482,6 +483,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .system_data_list = try std.ArrayList(ECSystemData).initCapacity(allocator, system_type_list.len),
                 .archetype_data_list = undefined,
                 .entity_interface_tick_data_list = std.ArrayList(InterfaceTickData).init(allocator),
+                .entities_queued_for_deletion = std.ArrayList(Entity).init(allocator),
             };
 
             const arch_list_data = comptime archetype_list.generateArchetypeListData();
@@ -537,6 +539,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             for (0..self.entity_data_list.items.len) |i| {
                 self.deinitEntity(@intCast(i));
             }
+            self.clearQueuedForDeletionEntities();
             self.entity_data_list.deinit();
 
             inline for (0..system_type_list.len) |i| {
@@ -558,9 +561,39 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
 
             self.entity_interface_tick_data_list.deinit();
+            self.entities_queued_for_deletion.deinit();
+        }
+
+        fn clearQueuedForDeletionEntities(self: *@This()) void {
+            if (self.entities_queued_for_deletion.items.len == 0) { return; }
+
+            for (self.entities_queued_for_deletion.items) |entity| {
+                var entity_data: *EntityData = &self.entity_data_list.items[entity];
+                inline for (0..entity_interface_types.len) |i| {
+                    const T: type = entity_interface_type_list.getType(i);
+                    if (T == entity_interface_types[i]) {
+                        if (entity_data.interface_instance) |interface_instance| {
+                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
+                            self.allocator.destroy(interface_ptr);
+                            entity_data.interface_instance = null;
+                        }
+                    }
+                }
+                inline for (0..component_types.len) |i| {
+                    if (entity_data.components[i]) |component| {
+                        const T: type = component_type_list.getType(i);
+                        const current_comp: *T = @alignCast(@ptrCast(component));
+                        self.allocator.destroy(current_comp);
+                        entity_data.components[i] = null;
+                    }
+                }
+            }
+            self.entities_queued_for_deletion.clearAndFree();
         }
 
         pub fn tick(self: *@This()) void {
+            self.clearQueuedForDeletionEntities();
+
             // Pre entity tick
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
@@ -692,25 +725,17 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                                 }.find);
                             }
 
-                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                             if (@hasDecl(T, "deinit")) {
+                                const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                                 interface_ptr.deinit(self, entity);
                             }
-                            self.allocator.destroy(interface_ptr);
-                            entity_data.interface_instance = null;
                         }
                     }
                 }
-                inline for (0..component_types.len) |i| {
-                    if (entity_data.components[i]) |component| {
-                        const T: type = component_type_list.getType(i);
-                        const current_comp: *T = @alignCast(@ptrCast(component));
-                        self.allocator.destroy(current_comp);
-                        entity_data.components[i] = null;
-                    }
-                }
+
                 entity_data.tag_list = .{};
                 entity_data.is_valid = false;
+                self.entities_queued_for_deletion.append(entity) catch { unreachable; }; // TODO: Clean up
             }
         }
 
