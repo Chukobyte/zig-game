@@ -24,7 +24,7 @@ pub const MainSystem = struct {
 pub const SpriteRenderingSystem = struct {
     pub fn render(self: *@This(), context: *ECSContext) void {
         _ = self;
-        var comp_iter = ComponentIterator(getArchetype()).init(context);
+        var comp_iter = context.compIter(getArchetype());
         while (comp_iter.next()) |iter| {
             const transform_comp = iter.getValue(0);
             const sprite_comp = iter.getValue(1);
@@ -38,7 +38,7 @@ pub const SpriteRenderingSystem = struct {
 pub const TextRenderingSystem = struct {
     pub fn render(self: *@This(), context: *ECSContext) void {
         _ = self;
-        var comp_iter = ComponentIterator(getArchetype()).init(context);
+        var comp_iter = context.compIter(getArchetype());
         while (comp_iter.next()) |iter| {
             const transform_comp = iter.getValue(0);
             const text_label_comp = iter.getValue(1);

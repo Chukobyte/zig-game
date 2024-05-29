@@ -2,6 +2,10 @@
 
 const std = @import("std");
 
+const misc = @import("misc");
+
+const ArrayListUtils = misc.ArrayListUtils;
+
 inline fn isValidPropertyType(comptime T: type) bool {
     return T == i32 or T == bool or T == f32 or T == []const u8;
 }
@@ -41,19 +45,46 @@ pub const Property = struct {
     type: PropertyType,
     value: PropertyValue,
     has_ever_been_written_to: bool = false,
+
+    pub fn Handle(comptime T: type) type {
+        if (!isValidPropertyType(T)) {
+            @compileError("Didn't pass in valid type to property handle!");
+        }
+        return struct {
+            property: *Property,
+            key: []const u8,
+            data_db: *ObjectDataDB,
+            object: *Object = undefined,
+
+            pub inline fn write(self: *@This(), value: T) !void {
+                try self.data_db.writeProperty(self.object, self.key, T, value);
+            }
+
+            pub inline fn read(self: *const @This()) !T {
+                return try self.data_db.readProperty(self.object, self.key, T);
+            }
+        };
+    }
 };
 
 pub const Object = struct {
-    //{
-    //  "name": "object_name",
-    //  "properties": [],
-    //  "subobjects": []
-    //{
-
     id: u32,
     name: []u8,
     properties: std.ArrayList(Property),
     subobjects: std.ArrayList(*Object),
+
+    pub const Handle = struct {
+        object: *Object,
+        data_db: *ObjectDataDB,
+
+        pub inline fn writeProperty(self: *@This(), key: []const u8, comptime T: type, value: T) !void {
+            try self.data_db.writeProperty(self.object, key, T, value);
+        }
+
+        pub inline fn readProperty(self: *@This(), key: []const u8, comptime T: type) !T {
+            try self.data_db.readProperty(self.object, key, T);
+        }
+    };
 };
 
 pub const ObjectDataDB = struct {
@@ -110,6 +141,30 @@ pub const ObjectDataDB = struct {
         return new_object;
     }
 
+    pub fn findObject(self: *@This(), name: []const u8) ?*Object {
+        for (self.objects.items) |*object| {
+            if (std.mem.eql(u8, name, object.name)) {
+                return object;
+            }
+        }
+        return null;
+    }
+
+    pub fn findOrAddObject(self: *@This(), name: []const u8) !*Object {
+        if (self.findObject(name)) |object| {
+            return object;
+        }
+        return try createObject(name);
+    }
+
+    // pub fn removeObject(self: *@This(), object: *Object) void {
+    //     self.removeObjectByName(object.name);
+    // }
+
+    // pub fn removeObjectByName(self: *@This(), object: *Object) void {
+    //     // ArrayListUtils
+    // }
+
     pub fn addAsSubObject(self: *@This(), object: *Object, sub_object: *Object) !void {
         _ = self;
         try object.subobjects.append(sub_object);
@@ -134,7 +189,7 @@ pub const ObjectDataDB = struct {
         currentProperty.has_ever_been_written_to = true;
     }
 
-    pub fn readProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type) ObjectError!T {
+    pub fn readProperty(self: *@This(), object: *const Object, name: []const u8, comptime T: type) ObjectError!T {
         if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
 
         if (findProperty(self, object, name)) |property| {
@@ -149,7 +204,7 @@ pub const ObjectDataDB = struct {
         return ObjectError.FailedToFindProperty;
     }
 
-    pub fn findProperty(self: *@This(), object: *Object, key: []const u8) ?*Property {
+    pub fn findProperty(self: *@This(), object: *const Object, key: []const u8) ?*Property {
         _ = self;
         for (object.properties.items) |*property| {
             if (std.mem.eql(u8, property.key, key)) {
@@ -194,6 +249,18 @@ pub const ObjectDataDB = struct {
             self.allocator.free(removed_prop.key);
             _ = object.properties.swapRemove(index);
         }
+    }
+
+    pub fn createPropertyHandle(self: *@This(), object: *Object, comptime T: type, key: []const u8) !Property.Handle(T) {
+        const HandleT = Property.Handle(T);
+        const prop = try self.findOrAddProperty(T, object, key);
+        const handle = HandleT{
+            .property = prop,
+            .key = key,
+            .data_db = self,
+            .object = object,
+        };
+        return handle;
     }
 };
 

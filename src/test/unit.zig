@@ -9,6 +9,7 @@ const data_db = engine.data_db;
 const core = engine.core;
 const ecs = engine.ecs;
 const string = engine.string;
+const misc = engine.misc;
 
 const ObjectsList = data_db.ObjectsList;
 const Object = data_db.Object;
@@ -123,7 +124,7 @@ test "type list test" {
     const TestType1 = struct {};
     const TestType2 = struct {};
 
-    const TestTypeList = ecs.TypeList(&.{ TestType0, TestType1, TestType2 });
+    const TestTypeList = misc.TypeList(&.{ TestType0, TestType1, TestType2 });
     try std.testing.expectEqual(0, TestTypeList.getIndex(TestType0));
     try std.testing.expectEqual(1, TestTypeList.getIndex(TestType1));
     try std.testing.expectEqual(TestType0, TestTypeList.getType(0));
@@ -200,6 +201,18 @@ test "ecs test" {
         try std.testing.expectEqual(0, iter.getEntity());
     }
 
+    // Using context to generate iterator
+    var comp_iterator3 = ecs_context.compIter(&.{ TransformComponent, DialogueComponent });
+    while (comp_iterator3.next()) |iter| {
+        const iter_trans_comp = iter.getValue(0);
+        const iter_trans_comp2 = iter.getComponent(TransformComponent);
+        const iter_dialogue_comp = iter.getValue(1);
+        const iter_dialogue_comp2 = iter.getComponent(DialogueComponent);
+        try std.testing.expectEqual(iter_trans_comp, iter_trans_comp2);
+        try std.testing.expectEqual(iter_dialogue_comp, iter_dialogue_comp2);
+    }
+
+
     // Test entity interface
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
@@ -238,7 +251,7 @@ test "ecs test" {
 }
 
 test "tag list test" {
-    const Tags = ecs.TagList(2);
+    const Tags = misc.TagList(2);
     const tag_list = Tags.initFromSlice(&.{ "test", "okay" });
     try std.testing.expectEqual(2, tag_list.tag_count);
     try std.testing.expectEqualStrings("test", tag_list.tags[0]);
@@ -270,6 +283,11 @@ test "object data db read and write test" {
     defer allocator.free(temp_object2.name);
     try data_db_inst.addAsSubObject(temp_object, temp_object2);
     try std.testing.expect(temp_object.subobjects.items.len == 1);
+
+    var age_handle = try data_db_inst.createPropertyHandle(temp_object, i32, "age");
+    try std.testing.expectEqual(8, age_handle.read());
+    try age_handle.write(32);
+    try std.testing.expectEqual(32, age_handle.read());
 }
 
 test "object data db json test" {
