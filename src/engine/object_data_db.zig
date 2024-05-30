@@ -141,6 +141,7 @@ pub const ObjectDataDB = struct {
         return new_object;
     }
 
+    /// Finds the first object by name
     pub fn findObject(self: *@This(), name: []const u8) ?*Object {
         for (self.objects.items) |*object| {
             if (std.mem.eql(u8, name, object.name)) {
@@ -171,6 +172,7 @@ pub const ObjectDataDB = struct {
         ArrayListUtils.removeByValue(Object, &self.objects, object);
     }
 
+    /// Finds the first object by name
     pub fn deleteObjectByName(self: *@This(), name: []const u8) void {
         if (ArrayListUtils.findIndexByPred2(
             Object,
@@ -183,6 +185,7 @@ pub const ObjectDataDB = struct {
         }
     }
 
+    /// Checks if there is atleast one object with the passed in name
     pub fn hasObject(self: *@This(), name: []const u8) bool {
         return ArrayListUtils.findIndexByPred2(
             Object,
@@ -198,10 +201,10 @@ pub const ObjectDataDB = struct {
         try object.subobjects.append(sub_object);
     }
 
-    pub fn writeProperty(self: *@This(), object: *Object, name: []const u8, comptime T: type, value: T) !void {
+    pub fn writeProperty(self: *@This(), object: *Object, key: []const u8, comptime T: type, value: T) !void {
         if (!isValidPropertyType(T)) { @compileError("value is not a valid property type!"); }
 
-        const currentProperty: *Property = try findOrAddProperty(self, T, object, name);
+        const currentProperty: *Property = try findOrAddProperty(self, T, object, key);
         switch (comptime @typeInfo(T)) {
             .Bool => currentProperty.value = PropertyValue{ .boolean = value },
             .Int => currentProperty.value = PropertyValue{ .integer = value },
@@ -217,10 +220,10 @@ pub const ObjectDataDB = struct {
         currentProperty.has_ever_been_written_to = true;
     }
 
-    pub fn readProperty(self: *@This(), object: *const Object, name: []const u8, comptime T: type) ObjectError!T {
+    pub fn readProperty(self: *@This(), object: *const Object, key: []const u8, comptime T: type) ObjectError!T {
         if (!isValidPropertyType(T)) { @compileError("value is not a value property type!"); }
 
-        if (findProperty(self, object, name)) |property| {
+        if (findProperty(self, object, key)) |property| {
             switch (comptime @typeInfo(T)) {
                 .Bool => return property.value.boolean,
                 .Int => return property.value.integer,
