@@ -51,8 +51,9 @@ pub fn build(b: *std.Build) void {
         description: []const u8,
     };
 
-    const test_defs: [2]TestDefinition = .{
+    const test_defs = [_]TestDefinition{
         .{ .name = "test", .description = "Run unit tests for the game", .file_path = "src/test/unit.zig" },
+        .{ .name = "integration-test", .description = "Run integration tests for the game", .file_path = "src/test/integration.zig" },
         .{ .name = "perf-test", .description = "Run perf tests for the game", .file_path = "src/test/perf.zig" },
     };
 

@@ -17,11 +17,11 @@ const Property = data_db.Property;
 
 const DialogueComponent = struct {
     text: []const u8,
-    };
+};
 
 const TransformComponent = struct {
     transform: math.Transform2D,
-    };
+};
 
 const TestEntityInterface = struct {
     var has_called_init = false;
@@ -84,7 +84,7 @@ const TestECSystem = struct {
 
 const TestECSystem2 = struct {
     pub fn getArchetype() []const type { return &.{ TransformComponent, DialogueComponent }; }
-    };
+};
 
 test "archetype test" {
     const TestComp0 = struct {};
@@ -95,17 +95,17 @@ test "archetype test" {
         pub fn getArchetype() []const type {
             return &.{ TestComp0, TestComp1 };
         }
-        };
+    };
     const TestSystem1 = struct {
         pub fn getArchetype() []const type {
             return &.{ TestComp0, TestComp2 };
         }
-        };
+    };
     const TestSystem2 = struct {
         pub fn getArchetype() []const type {
             return &.{ TestComp2, TestComp0 };
         }
-        };
+    };
 
     const TestArchetype0 = &.{ TestComp0, TestComp1 };
     const TestArchetype1 = &.{ TestComp0, TestComp2 };
@@ -340,7 +340,6 @@ test "object data db json test" {
     defer parsed.deinit();
 
     var object_list: ObjectsList = parsed.value;
-    defer object_list.deinit();
 
     const first_game_object: *Object = &object_list.objects[0];
     try std.testing.expectEqualStrings("Mike", first_game_object.name);

@@ -93,18 +93,19 @@ pub const ObjectDataDB = struct {
     allocator: std.mem.Allocator,
     object_ids_index: u32 = 1,
 
-    pub const FileOutputType = enum {
+    pub const ReadWriteMode = enum {
         binary,
         json,
     };
 
-    pub const FileReadConfig = struct {
+    pub const SerializeParams = struct {
         file_path: []const u8,
+        mode: ReadWriteMode,
     };
 
-    pub const FileWriteConfig = struct {
+    pub const DeserializeParams = struct {
         file_path: []const u8,
-        output_type: FileOutputType = FileOutputType.json,
+        mode: ReadWriteMode,
     };
 
     pub fn init(allocator: std.mem.Allocator) @This() {
@@ -121,14 +122,54 @@ pub const ObjectDataDB = struct {
         self.objects.deinit();
     }
 
-    pub fn readFromFile(self: *@This(), read_config: FileReadConfig) void {
-        _ = self;
-        _ = read_config;
+    pub fn serialize(self: *@This(), params: SerializeParams) !void {
+        const SizeT = usize;
+        const file_path = params.file_path;
+        const write_mode = params.mode;
+
+        const objects_list = ObjectsList{ .objects = self.objects.items[0..] };
+        const file = try std.fs.createFileAbsolute(file_path, .{});
+        defer file.close();
+
+        const json_string = try std.json.stringifyAlloc(self.allocator, objects_list, .{ .whitespace = .indent_2 });
+        defer self.allocator.free(json_string);
+
+        switch (write_mode) {
+            .binary => {
+                var bytes = try self.allocator.alloc(u8, @sizeOf(SizeT) + json_string.len);
+                defer self.allocator.free(bytes);
+                std.mem.writeInt(SizeT, bytes[0..@sizeOf(SizeT)], json_string.len, .little); // Serialize the length
+                std.mem.copyForwards(u8, bytes[@sizeOf(SizeT)..], json_string); // Serialize the json string
+                _ = try file.write(bytes);
+            },
+            .json => { try file.writeAll(json_string); },
+        }
     }
 
-    pub fn writeToFile(self: *@This(), write_config: FileWriteConfig) void {
-        _ = self;
-        _ = write_config;
+    pub fn deserialize(self: *@This(), params: SerializeParams) !void {
+        const SizeT = usize;
+        const file_path = params.file_path;
+        const read_mode = params.mode;
+
+        const file = try std.fs.openFileAbsolute(file_path, .{ .mode = .read_only });
+        defer file.close();
+
+        const bytes = try file.readToEndAlloc(self.allocator, 2048);
+        defer self.allocator.free(bytes);
+
+        const json_string = switch (read_mode) {
+            .binary => blk: {
+                break :blk bytes[@sizeOf(SizeT)..];
+            },
+            .json => bytes,
+        };
+
+        // std.debug.print("file_contents = \n--------------------------------\n{s}\n--------------------------------\n", .{ json_string });
+
+        const parsed = try std.json.parseFromSlice(ObjectsList,self.allocator, json_string, .{});
+        defer parsed.deinit();
+        const object_list: ObjectsList = parsed.value;
+        try self.importObjects(object_list.objects);
     }
 
     pub fn createObject(self: *@This(), name: []const u8) std.mem.Allocator.Error!*Object {
@@ -156,6 +197,24 @@ pub const ObjectDataDB = struct {
         }
     }
 
+    pub fn importObjects(self: *@This(), objects: []const Object) !void {
+        for (objects) |*obj| {
+            const imported_object = try self.findOrAddObject(obj.name);
+            try self.copyObject(imported_object, obj);
+        }
+    }
+
+    pub fn copyObject(self: *@This(), dest: *Object, src: *const Object) !void {
+        dest.id = src.id;
+        // dest.name = try self.allocator.dupe(u8, src.name);
+        for (src.properties.items) |prop| {
+            try dest.properties.append(prop);
+            dest.properties.items[dest.properties.items.len - 1].key = try self.allocator.dupe(u8, prop.key);
+        }
+        // TODO: Copy subobjects
+        // for (src.subobjects) |subobj| {}
+    }
+
     /// Finds the first object by name
     pub fn findObject(self: *@This(), name: []const u8) ?*Object {
         for (self.objects.items) |*object| {
@@ -170,7 +229,7 @@ pub const ObjectDataDB = struct {
         if (self.findObject(name)) |object| {
             return object;
         }
-        return try createObject(name);
+        return try self.createObject(name);
     }
 
     /// Recursive function to delete an object and all its subobjects
@@ -324,10 +383,6 @@ pub const ObjectDataDB = struct {
 
 pub const ObjectsList = struct {
     objects: []Object = undefined,
-
-    pub fn deinit(self: *@This()) void {
-        _ = self;
-    }
 
     pub fn jsonStringify(self: *const @This(), out: anytype) !void {
         try out.beginObject();
