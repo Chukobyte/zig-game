@@ -265,22 +265,19 @@ test "object data db read and write test" {
     var data_db_inst = data_db.ObjectDataDB.init(allocator);
     defer data_db_inst.deinit();
     const temp_object = try data_db_inst.createObject("Test");
-    defer allocator.free(temp_object.name);
+    try std.testing.expectEqual(true, data_db_inst.hasObject("Test"));
     try data_db_inst.writeProperty(temp_object, "age", i32, 8);
     const age_property_optional = data_db_inst.findProperty(temp_object, "age");
     const age_property = age_property_optional.?;
     try std.testing.expectEqual(8, age_property.value.integer);
-    defer data_db_inst.removeProperty(temp_object, age_property);
     const old_age = try data_db_inst.readProperty(temp_object, "age", i32);
     try std.testing.expectEqual(8, old_age);
 
     try data_db_inst.writeProperty(temp_object, "name", []const u8, "Daniel");
-    defer data_db_inst.removePropertyByKey(temp_object, "name");
     const name = try data_db_inst.readProperty(temp_object, "name", []const u8);
     try std.testing.expectEqualStrings("Daniel", name);
 
     const temp_object2 = try data_db_inst.createObject("Test2");
-    defer allocator.free(temp_object2.name);
     try data_db_inst.addAsSubObject(temp_object, temp_object2);
     try std.testing.expect(temp_object.subobjects.items.len == 1);
 
@@ -288,6 +285,10 @@ test "object data db read and write test" {
     try std.testing.expectEqual(8, age_handle.read());
     try age_handle.write(32);
     try std.testing.expectEqual(32, age_handle.read());
+
+    data_db_inst.deleteObjectByName("Test");
+    try std.testing.expectEqual(false, data_db_inst.hasObject("Test"));
+    try std.testing.expectEqual(false, data_db_inst.hasObject("Test2"));
 }
 
 test "object data db json test" {

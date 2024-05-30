@@ -2,7 +2,7 @@
 
 const std = @import("std");
 
-const misc = @import("misc");
+const misc = @import("misc.zig");
 
 const ArrayListUtils = misc.ArrayListUtils;
 
@@ -88,7 +88,8 @@ pub const Object = struct {
 };
 
 pub const ObjectDataDB = struct {
-    objects: std.ArrayList(Object),
+
+    objects: std.ArrayList(Object), // All top root level objects
     allocator: std.mem.Allocator,
     object_ids_index: u32 = 1,
 
@@ -114,9 +115,8 @@ pub const ObjectDataDB = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        for (self.objects.items) |object| {
-            object.properties.deinit();
-            object.subobjects.deinit();
+        for (self.objects.items) |*object| {
+            self.deleteObject(object); // TODO: Can use a more efficient code path but this if fine for now...
         }
         self.objects.deinit();
     }
@@ -157,13 +157,41 @@ pub const ObjectDataDB = struct {
         return try createObject(name);
     }
 
-    // pub fn removeObject(self: *@This(), object: *Object) void {
-    //     self.removeObjectByName(object.name);
-    // }
+    /// Recursive function to delete an object and all its subobjects
+    pub fn deleteObject(self: *@This(), object: *Object) void {
+        for (object.subobjects.items) |subobj| {
+            self.deleteObject(subobj);
+        }
+        for (object.properties.items) |*prop| {
+            self.removeProperty(object, prop);
+        }
+        object.properties.deinit();
+        object.subobjects.deinit();
+        self.allocator.free(object.name);
+        ArrayListUtils.removeByValue(Object, &self.objects, object);
+    }
 
-    // pub fn removeObjectByName(self: *@This(), object: *Object) void {
-    //     // ArrayListUtils
-    // }
+    pub fn deleteObjectByName(self: *@This(), name: []const u8) void {
+        if (ArrayListUtils.findIndexByPred2(
+            Object,
+            []const u8,
+            &self.objects,
+            &name,
+            struct { pub fn removeIf(obj_name: *const []const u8, obj: *const Object) bool { return std.mem.eql(u8, obj_name.*, obj.name); } }.removeIf
+        )) |i| {
+            self.deleteObject(&self.objects.items[i]);
+        }
+    }
+
+    pub fn hasObject(self: *@This(), name: []const u8) bool {
+        return ArrayListUtils.findIndexByPred2(
+            Object,
+            []const u8,
+            &self.objects,
+            &name,
+            struct { pub fn removeIf(obj_name: *const []const u8, obj: *const Object) bool { return std.mem.eql(u8, obj_name.*, obj.name); } }.removeIf
+        ) != null;
+    }
 
     pub fn addAsSubObject(self: *@This(), object: *Object, sub_object: *Object) !void {
         _ = self;

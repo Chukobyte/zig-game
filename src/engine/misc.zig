@@ -22,6 +22,15 @@ pub const ArrayListUtils = struct {
         return null;
     }
 
+    pub fn findIndexByPred2(comptime T: type, comptime T2: type, list: *std.ArrayList(T), value: *const T2, pred: *const fn(*const T2, *const T) bool) ?usize {
+        for (list.items, 0..list.items.len) |*item, i| {
+            if (pred(value, item)) {
+                return i;
+            }
+        }
+        return null;
+    }
+
     pub fn removeByValue(comptime T: type, list: *std.ArrayList(T), value: *const T) void {
         if (findIndexByValue(T, list, value)) |i| {
             _ = list.swapRemove(i);
@@ -30,6 +39,12 @@ pub const ArrayListUtils = struct {
 
     pub fn removeByPred(comptime T: type, list: *std.ArrayList(T), value: *const T, pred: *const fn(*const T, *const T) bool) void {
         if (findIndexByPred(T, list, value, pred)) |i| {
+            _ = list.swapRemove(i);
+        }
+    }
+
+    pub fn removeByPred2(comptime T: type, comptime T2: type, list: *std.ArrayList(T), value: *const T2, pred: *const fn(*const T2, *const T) bool) void {
+        if (findIndexByPred2(T, T2, list, value, pred)) |i| {
             _ = list.swapRemove(i);
         }
     }
