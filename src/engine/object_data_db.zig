@@ -141,6 +141,21 @@ pub const ObjectDataDB = struct {
         return new_object;
     }
 
+    pub fn createObjectFromType(self: *@This(), comptime T: type, value: *const T, name: []const u8) std.mem.Allocator.Error!*Object {
+        const obj: *Object = self.findObject(name) orelse try self.createObject(name);
+        try self.serializeTypeIntoObject(T, value, obj);
+        return obj;
+    }
+
+    pub fn serializeTypeIntoObject(self: *@This(), comptime T: type, value: *const T, object: *Object) !void {
+        self.clearObject(object);
+        inline for (@typeInfo(T).Struct.fields) |field| {
+            if (comptime isValidPropertyType(field.type)) {
+                try self.writeProperty(object, field.name, field.type, @field(value, field.name));
+            }
+        }
+    }
+
     /// Finds the first object by name
     pub fn findObject(self: *@This(), name: []const u8) ?*Object {
         for (self.objects.items) |*object| {
@@ -170,6 +185,18 @@ pub const ObjectDataDB = struct {
         object.subobjects.deinit();
         self.allocator.free(object.name);
         ArrayListUtils.removeByValue(Object, &self.objects, object);
+    }
+
+    /// Clears all properties and subobjects from an object
+    pub fn clearObject(self: *@This(), object: *Object) void {
+        for (object.subobjects.items) |subobj| {
+            self.deleteObject(subobj);
+        }
+        for (object.properties.items) |*prop| {
+            self.removeProperty(object, prop);
+        }
+        object.properties.clearAndFree();
+        object.subobjects.clearAndFree();
     }
 
     /// Finds the first object by name

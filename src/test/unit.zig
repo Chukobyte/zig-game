@@ -289,6 +289,21 @@ test "object data db read and write test" {
     data_db_inst.deleteObjectByName("Test");
     try std.testing.expectEqual(false, data_db_inst.hasObject("Test"));
     try std.testing.expectEqual(false, data_db_inst.hasObject("Test2"));
+
+    // Serialize test
+    const SimpleStruct = struct {
+        num: i32,
+    };
+
+    var simple = SimpleStruct{ .num = 99 };
+    const simple_object = try data_db_inst.createObject("Simple");
+    try data_db_inst.serializeTypeIntoObject(SimpleStruct, &simple, simple_object);
+    const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
+    try std.testing.expect(simple_object_prop != null);
+    try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
+
+    const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, "Simple2");
+    try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
 }
 
 test "object data db json test" {
