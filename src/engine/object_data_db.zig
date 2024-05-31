@@ -186,7 +186,9 @@ pub const ObjectDataDB = struct {
         new_object.properties = std.ArrayList(Property).init(self.allocator);
         new_object.subobjects = std.ArrayList(*Object).init(self.allocator);
         new_object.parent = params.parent;
-        if (new_object.parent == null) {
+        if (new_object.parent) |parent| {
+            try parent.subobjects.append(new_object);
+        } else {
             try self.root_objects.append(new_object);
         }
         self.object_ids_index += 1;
@@ -302,11 +304,6 @@ pub const ObjectDataDB = struct {
             &name,
             struct { pub fn removeIf(obj_name: *const []const u8, obj: *const Object) bool { return std.mem.eql(u8, obj_name.*, obj.name); } }.removeIf
         ) != null;
-    }
-
-    pub fn addAsSubObject(self: *@This(), object: *Object, sub_object: *Object) !void {
-        _ = self;
-        try object.subobjects.append(sub_object);
     }
 
     pub fn writeProperty(self: *@This(), object: *Object, key: []const u8, comptime T: type, value: T) !void {

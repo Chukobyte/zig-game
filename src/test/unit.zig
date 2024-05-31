@@ -277,8 +277,8 @@ test "object data db read and write test" {
     const name = try data_db_inst.readProperty(temp_object, "name", []const u8);
     try std.testing.expectEqualStrings("Daniel", name);
 
-    const temp_object2 = try data_db_inst.createObject(.{ .name = "Test2" });
-    try data_db_inst.addAsSubObject(temp_object, temp_object2);
+    // Test adding subobject
+    _ = try data_db_inst.createObject(.{ .name = "Test2", .parent = temp_object });
     try std.testing.expect(temp_object.subobjects.items.len == 1);
 
     var age_handle = try data_db_inst.createPropertyHandle(temp_object, i32, "age");
