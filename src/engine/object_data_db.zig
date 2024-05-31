@@ -110,9 +110,14 @@ pub const ObjectDataDB = struct {
         mode: ReadWriteMode,
     };
 
+    pub const CreateObjectParams = struct {
+        name: []const u8,
+        parent: ?*Object = null,
+    };
+
     pub fn init(allocator: std.mem.Allocator) @This() {
         return ObjectDataDB{
-            .objects = std.ArrayList(Object).init(allocator),
+            .objects = std.ArrayList(Object).initCapacity(allocator, 100) catch unreachable,
             .root_objects = std.ArrayList(*Object).init(allocator),
             .allocator = allocator,
         };
@@ -174,13 +179,13 @@ pub const ObjectDataDB = struct {
         try self.importObjects(object_list.objects);
     }
 
-    pub fn createObject(self: *@This(), name: []const u8) std.mem.Allocator.Error!*Object {
-        var new_object: *Object = try self.objects.addOne();
+    pub fn createObject(self: *@This(), params: CreateObjectParams) std.mem.Allocator.Error!*Object {
+        var new_object: *Object = try self.objects.addOne(); // TODO: Check for resize and update root_objects ArrayList
         new_object.id = self.object_ids_index;
-        new_object.name = try self.allocator.dupe(u8, name);
+        new_object.name = try self.allocator.dupe(u8, params.name);
         new_object.properties = std.ArrayList(Property).init(self.allocator);
         new_object.subobjects = std.ArrayList(*Object).init(self.allocator);
-        new_object.parent = null;
+        new_object.parent = params.parent;
         if (new_object.parent == null) {
             try self.root_objects.append(new_object);
         }
@@ -188,8 +193,8 @@ pub const ObjectDataDB = struct {
         return new_object;
     }
 
-    pub fn createObjectFromType(self: *@This(), comptime T: type, value: *const T, name: []const u8) std.mem.Allocator.Error!*Object {
-        const obj: *Object = self.findObject(name) orelse try self.createObject(name);
+    pub fn createObjectFromType(self: *@This(), comptime T: type, value: *const T, params: CreateObjectParams) std.mem.Allocator.Error!*Object {
+        const obj: *Object = self.findObject(params.name) orelse try self.createObject(params);
         try self.serializeTypeIntoObject(T, value, obj);
         return obj;
     }
@@ -205,7 +210,7 @@ pub const ObjectDataDB = struct {
 
     pub fn importObjects(self: *@This(), objects: []const Object) !void {
         for (objects) |*obj| {
-            const imported_object = try self.findOrAddObject(obj.name);
+            const imported_object = try self.findOrAddObject(.{ .name = obj.name });
             try self.copyObject(imported_object, obj);
         }
     }
@@ -231,11 +236,11 @@ pub const ObjectDataDB = struct {
         return null;
     }
 
-    pub fn findOrAddObject(self: *@This(), name: []const u8) !*Object {
-        if (self.findObject(name)) |object| {
+    pub fn findOrAddObject(self: *@This(), params: CreateObjectParams) !*Object {
+        if (self.findObject(params.name)) |object| {
             return object;
         }
-        return try self.createObject(name);
+        return try self.createObject(params);
     }
 
     /// Recursive function to delete an object and all its subobjects

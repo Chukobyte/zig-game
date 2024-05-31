@@ -32,13 +32,13 @@ test "object data db read and write test" {
         defer data_db_inst.deinit();
 
         var simple = SimpleStruct{ .num = 99 };
-        const simple_object = try data_db_inst.createObject("Simple");
+        const simple_object = try data_db_inst.createObject(.{ .name = "Simple" });
         try data_db_inst.serializeTypeIntoObject(SimpleStruct, &simple, simple_object);
         const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
         try std.testing.expect(simple_object_prop != null);
         try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
 
-        const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, "Simple2");
+        const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, .{ .name = "Simple2" });
         try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
 
         try data_db_inst.serialize(.{ .file_path = binary_serialize_path, .mode = .binary });
@@ -55,12 +55,12 @@ test "object data db read and write test" {
         defer data_db_inst.deinit();
 
         try data_db_inst.deserialize(.{ .file_path = params.file_path, .mode = params.mode });
-        const simple_object = try data_db_inst.findOrAddObject("Simple");
+        const simple_object = try data_db_inst.findOrAddObject(.{ .name = "Simple" });
         const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
         try std.testing.expect(simple_object_prop != null);
         try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
 
-        const simple_object2 = try data_db_inst.findOrAddObject("Simple2");
+        const simple_object2 = try data_db_inst.findOrAddObject(.{ .name = "Simple2" });
         try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
     }
 }

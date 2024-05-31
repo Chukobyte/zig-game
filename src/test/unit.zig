@@ -264,7 +264,7 @@ test "object data db read and write test" {
     const allocator = std.testing.allocator;
     var data_db_inst = data_db.ObjectDataDB.init(allocator);
     defer data_db_inst.deinit();
-    const temp_object = try data_db_inst.createObject("Test");
+    const temp_object = try data_db_inst.createObject(.{ .name = "Test" });
     try std.testing.expectEqual(true, data_db_inst.hasObject("Test"));
     try data_db_inst.writeProperty(temp_object, "age", i32, 8);
     const age_property_optional = data_db_inst.findProperty(temp_object, "age");
@@ -277,7 +277,7 @@ test "object data db read and write test" {
     const name = try data_db_inst.readProperty(temp_object, "name", []const u8);
     try std.testing.expectEqualStrings("Daniel", name);
 
-    const temp_object2 = try data_db_inst.createObject("Test2");
+    const temp_object2 = try data_db_inst.createObject(.{ .name = "Test2" });
     try data_db_inst.addAsSubObject(temp_object, temp_object2);
     try std.testing.expect(temp_object.subobjects.items.len == 1);
 
@@ -296,13 +296,13 @@ test "object data db read and write test" {
     };
 
     var simple = SimpleStruct{ .num = 99 };
-    const simple_object = try data_db_inst.createObject("Simple");
+    const simple_object = try data_db_inst.createObject(.{ .name = "Simple" });
     try data_db_inst.serializeTypeIntoObject(SimpleStruct, &simple, simple_object);
     const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
     try std.testing.expect(simple_object_prop != null);
     try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
 
-    const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, "Simple2");
+    const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, .{ .name = "Simple2" });
     try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
 }
 
