@@ -5,6 +5,7 @@ const math = zeika.math;
 
 const game = @import("game.zig");
 const comps = @import("components.zig");
+const state = @import("state.zig");
 
 const engine = @import("engine");
 const core = engine.core;
@@ -17,9 +18,10 @@ const Color = math.Color;
 const Texture = zeika.Texture;
 const Font = zeika.Font;
 
-
 const Sprite = core.Sprite;
 const TextLabel = core.TextLabel;
+
+const PersistentState = state.PersistentState;
 
 const ECSContext = game.ECSContext;
 const Entity = ECSContext.Entity;
@@ -30,9 +32,8 @@ const ColliderComponent = comps.ColliderComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 
 pub const SpriteButtonInterface = struct {
-    money: i32 = 0,
-
     pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
+        _ = self;
         const trans_comp = context.getComponent(entity, TransformComponent).?;
         const sprite_comp = context.getComponent(entity, SpriteComponent).?;
         const collider_comp = context.getComponent(entity, ColliderComponent).?;
@@ -58,8 +59,9 @@ pub const SpriteButtonInterface = struct {
             if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
                 if (context.getEntityByTag("text_label")) |text_label_entity| {
                     if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                        self.money += 1;
-                        text_label_comp.text_label.setText("Money: {d}", .{ self.money }) catch { unreachable; };
+                        var persistent_state = PersistentState.get();
+                        persistent_state.energy.addScalar(&persistent_state.energy, 1) catch unreachable;
+                        text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
                     }
                 }
             }
@@ -69,4 +71,18 @@ pub const SpriteButtonInterface = struct {
     }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, ColliderComponent }; }
+};
+
+pub const EnergyTextLabelInterface = struct {
+    pub fn idleIncrement(self: *@This(), context: *ECSContext, entity: Entity) void {
+        _ = self;
+        const energyPerIncrement = 1;
+        if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
+            var persistent_state = PersistentState.get();
+            persistent_state.energy.addScalar(&persistent_state.energy, energyPerIncrement) catch unreachable;
+            text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
+        }
+    }
+
+    pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
 };

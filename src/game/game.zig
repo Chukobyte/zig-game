@@ -6,9 +6,10 @@ const math = zeika.math;
 const assets = @import("assets");
 const engine = @import("engine");
 
-const comps = @import("components.zig");
-const ec_systems = @import("ec_systems.zig");
-const entity_interfaces = @import("entity_interfaces.zig");
+pub const state = @import("state.zig");
+pub const comps = @import("components.zig");
+pub const ec_systems = @import("ec_systems.zig");
+pub const entity_interfaces = @import("entity_interfaces.zig");
 
 const core = engine.core;
 const ecs = engine.ecs;
@@ -25,23 +26,31 @@ const Sprite = core.Sprite;
 const TextLabel = core.TextLabel;
 const Collision = core.Collision;
 const Camera = core.Camera;
-const GameProperties = core.GameProperties;
 
 const MainSystem = ec_systems.MainSystem;
 const SpriteRenderingSystem = ec_systems.SpriteRenderingSystem;
 const TextRenderingSystem = ec_systems.TextRenderingSystem;
 
+const PersistentState = state.PersistentState;
+
 const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
+const EnergyTextLabelInterface = entity_interfaces.EnergyTextLabelInterface;
 
 const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const ColliderComponent = comps.ColliderComponent;
 
+pub const GameProperties = struct {
+    title: []const u8 = "ZigTest",
+    initial_window_size: Vec2i = .{ .x = 800, .y = 450 },
+    resolution: Vec2i = .{ .x = 800, .y = 450 },
+};
+
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ SpriteButtonInterface },
+    .entity_interfaces = &.{ SpriteButtonInterface, EnergyTextLabelInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem },
 });
@@ -49,6 +58,7 @@ pub const ECSContext = ecs.ECSContext(.{
 var is_game_running = false;
 
 pub fn init(props: GameProperties) !void {
+    _ = PersistentState.init(std.heap.page_allocator);
     game_properties = props;
     try zeika.initAll(
         game_properties.title,
@@ -65,6 +75,7 @@ pub inline fn initAndRun(props: GameProperties) !void {
 }
 
 pub fn deinit() void {
+    PersistentState.get().deinit();
     zeika.shutdownAll();
 }
 
@@ -109,13 +120,13 @@ pub fn run() !void {
             });
             try self.ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
 
-            const text_label_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "text_label" } });
+            const text_label_entity = try self.ecs_context.initEntity(.{ .interface = EnergyTextLabelInterface, .tags = &.{ "text_label" } });
             try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
             try self.ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
                 .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
             });
             if (self.ecs_context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                try text_label_comp.text_label.text.set("Money: 0", .{});
+                try text_label_comp.text_label.text.set("Energy: 0", .{});
             }
         }
     };
@@ -131,10 +142,20 @@ pub fn run() !void {
     defer scene.deinit();
     try scene.setupInitialScene();
 
+    var timer = try std.time.Timer.start();
+
     while (isGameRunning()) {
+        const seconds_to_increment: comptime_int = 1;
+        const nanoseconds_to_increment: comptime_int = seconds_to_increment * 1_000_000_000;
+        const current_time = timer.read();
+        if (current_time >= nanoseconds_to_increment) {
+            timer.reset();
+            ecs_context.event(.idle_increment);
+        }
+
         zeika.update();
-        ecs_context.tick();
-        ecs_context.render();
+        ecs_context.event(.tick);
+        ecs_context.event(.render);
         Renderer.flushBatches();
     }
 }

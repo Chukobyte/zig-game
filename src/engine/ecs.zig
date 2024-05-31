@@ -273,10 +273,17 @@ pub fn ECSContext(context_params: ECSContextParams) type {
 
         //--- ECSContext --- //
 
+        pub const EventType = enum {
+            idle_increment,
+            tick,
+            render,
+        };
+
         allocator: std.mem.Allocator,
         entity_data_list: std.ArrayList(EntityData),
         system_data_list: std.ArrayList(ECSystemData),
         archetype_data_list: [archetype_count]ArchetypeData,
+        entity_interface_idle_increment_data_list: std.ArrayList(InterfaceTickData),
         entity_interface_tick_data_list: std.ArrayList(InterfaceTickData),
         entities_queued_for_deletion: std.ArrayList(Entity),
         entity_id_counter: Entity = @as(Entity, 0),
@@ -287,6 +294,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .entity_data_list = std.ArrayList(EntityData).init(allocator),
                 .system_data_list = try std.ArrayList(ECSystemData).initCapacity(allocator, system_type_list.len),
                 .archetype_data_list = undefined,
+                .entity_interface_idle_increment_data_list = std.ArrayList(InterfaceTickData).init(allocator),
                 .entity_interface_tick_data_list = std.ArrayList(InterfaceTickData).init(allocator),
                 .entities_queued_for_deletion = std.ArrayList(Entity).init(allocator),
             };
@@ -366,6 +374,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
 
             self.entity_interface_tick_data_list.deinit();
+            self.entity_interface_idle_increment_data_list.deinit();
             self.entities_queued_for_deletion.deinit();
         }
 
@@ -396,7 +405,35 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             self.entities_queued_for_deletion.clearAndFree();
         }
 
-        pub fn tick(self: *@This()) void {
+        pub fn event(self: *@This(), comptime event_type: EventType) void {
+            switch (event_type) {
+                .idle_increment => self.idleIncrement(),
+                .tick => self.tick(),
+                .render => self.render(),
+            }
+        }
+
+        fn idleIncrement(self: *@This()) void {
+            for (self.entity_interface_idle_increment_data_list.items) |*entity_tick_data| {
+                inline for (0..entity_interface_types.len) |i| {
+                    const T: type = entity_interface_type_list.getType(i);
+                    if (@hasDecl(T, "idleIncrement")) {
+                        const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
+                        interface_ptr.idleIncrement(self, entity_tick_data.entity);
+                    }
+                }
+            }
+
+            inline for (0..system_type_list.len) |i| {
+                const T: type = system_type_list.getType(i);
+                if (@hasDecl(T, "idleIncrement")) {
+                    var system: *T = @alignCast(@ptrCast(self.system_data_list.items[i].interface_instance));
+                    system.idleIncrement(self);
+                }
+            }
+        }
+
+        fn tick(self: *@This()) void {
             self.clearQueuedForDeletionEntities();
 
             // Pre entity tick
@@ -412,11 +449,9 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             for (self.entity_interface_tick_data_list.items) |*entity_tick_data| {
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
-                    if (T == entity_interface_types[i]) {
-                        if (i == entity_tick_data.interface_id) {
-                            const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
-                            interface_ptr.tick(self, entity_tick_data.entity);
-                        }
+                    if (@hasDecl(T, "tick")) {
+                        const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
+                        interface_ptr.tick(self, entity_tick_data.entity);
                     }
                 }
             }
@@ -431,7 +466,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
         }
 
-        pub fn render(self: *@This()) void {
+        fn render(self: *@This()) void {
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
                 if (@hasDecl(T, "render")) {
@@ -492,6 +527,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 }
                 entity_data.interface_instance = new_interface;
 
+                if (@hasDecl(T, "idleIncrement")) {
+                    try self.entity_interface_idle_increment_data_list.append(InterfaceTickData{ .interface_id = entity_interface_type_list.getIndex(T), .entity = new_entity, .instance = new_interface });
+                }
+
                 if (@hasDecl(T, "tick")) {
                     try self.entity_interface_tick_data_list.append(InterfaceTickData{ .interface_id = entity_interface_type_list.getIndex(T), .entity = new_entity, .instance = new_interface });
                 }
@@ -522,6 +561,13 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
                         if (entity_data.interface_instance) |interface_instance| {
+                            if (@hasDecl(T, "idleIncrement")) {
+                                ArrayListUtils.removeByPred(InterfaceTickData, &self.entity_interface_idle_increment_data_list, &InterfaceTickData{ .interface_id = i, .instance = undefined, .entity = entity }, struct {
+                                    pub fn find(original: *const InterfaceTickData, value: *const InterfaceTickData) bool {
+                                        return original.entity == value.entity;
+                                    }
+                                }.find);
+                            }
                             if (@hasDecl(T, "tick")) {
                                 ArrayListUtils.removeByPred(InterfaceTickData, &self.entity_interface_tick_data_list, &InterfaceTickData{ .interface_id = i, .instance = undefined, .entity = entity }, struct {
                                     pub fn find(original: *const InterfaceTickData, value: *const InterfaceTickData) bool {
@@ -529,7 +575,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                                     }
                                 }.find);
                             }
-
                             if (@hasDecl(T, "deinit")) {
                                 const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
                                 interface_ptr.deinit(self, entity);

@@ -217,13 +217,13 @@ test "ecs test" {
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
     try std.testing.expectEqual(false, TestEntityInterface.has_called_tick);
-    ecs_context.tick();
+    ecs_context.event(.tick);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_tick);
     ecs_context.deinitEntity(new_entity);
     try std.testing.expectEqual(false, ecs_context.isEntityValid(new_entity));
     try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);
 
-    ecs_context.render();
+    ecs_context.event(.render);
 
     // Test weak entity ref
     const new_entity2: Entity = try ecs_context.initEntity(.{});
@@ -393,4 +393,32 @@ test "string test" {
     try std.testing.expectEqual(.stack, test_string2.mode);
     try std.testing.expectEqualStrings("Some nice text", test_string2.get());
     defer test_string2.deinit();
+}
+
+test "persistent state test" {
+    const PersistentState = game.state.PersistentState;
+    const allocator = std.testing.allocator;
+
+    const state = PersistentState.init(allocator);
+    defer state.deinit();
+
+    const BigInt = std.math.big.int.Managed;
+
+    var other = try BigInt.init(allocator);
+    var result = try BigInt.init(allocator);
+    defer other.deinit();
+    defer result.deinit();
+
+    try state.energy.setString(10, "3000");
+    try other.setString(10, "1000");
+    try result.add(&state.energy, &other);
+    var result_string = try result.toString(allocator, 10, .upper);
+    try state.energy.setString(10, result_string);
+    try std.testing.expectEqualStrings("4000", result_string);
+    allocator.free(result_string);
+
+    try result.addScalar(&state.energy, 8000);
+    result_string = try result.toString(allocator, 10, .upper);
+    try std.testing.expectEqualStrings("12000", result_string);
+    allocator.free(result_string);
 }

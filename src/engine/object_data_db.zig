@@ -7,7 +7,7 @@ const misc = @import("misc.zig");
 const ArrayListUtils = misc.ArrayListUtils;
 
 inline fn isValidPropertyType(comptime T: type) bool {
-    return T == i32 or T == bool or T == f32 or T == []const u8;
+    return T == i32 or T == bool or T == f32 or T == []const u8 or T == []u8;
 }
 
 const ObjectError = error{
@@ -214,7 +214,11 @@ pub const ObjectDataDB = struct {
         inline for (@typeInfo(T).Struct.fields) |field| {
             if (comptime isValidPropertyType(field.type)) {
                 if (self.readProperty(object, field.name, field.type) catch null) |read_value| {
-                    @field(value, field.name) = read_value;
+                    if (comptime field.type == []u8) {
+                        @field(value, field.name) = try self.allocator.dupe(u8, read_value);
+                    } else {
+                        @field(value, field.name) = read_value;
+                    }
                 }
             }
         }
@@ -233,6 +237,9 @@ pub const ObjectDataDB = struct {
         for (src.properties.items) |prop| {
             try dest.properties.append(prop);
             dest.properties.items[dest.properties.items.len - 1].key = try self.allocator.dupe(u8, prop.key);
+            if (dest.properties.items[dest.properties.items.len - 1].type == .string) {
+                dest.properties.items[dest.properties.items.len - 1].value.string = try self.allocator.dupe(u8, prop.value.string);
+            }
         }
         // TODO: Copy subobjects
         // for (src.subobjects) |subobj| {}

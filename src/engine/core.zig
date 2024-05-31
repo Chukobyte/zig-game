@@ -76,9 +76,3 @@ pub const Camera = struct {
     zoom: Vec2 = Vec2.One,
     offset: Vec2 = Vec2.Zero,
 };
-
-pub const GameProperties = struct {
-    title: []const u8 = "ZigTest",
-    initial_window_size: Vec2i = .{ .x = 800, .y = 450 },
-    resolution: Vec2i = .{ .x = 800, .y = 450 },
-};

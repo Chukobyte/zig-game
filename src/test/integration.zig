@@ -19,6 +19,7 @@ test "object data db read and write test" {
     // Serialize test
     const SimpleStruct = struct {
         num: i32,
+        text: []u8,
     };
 
     const binary_serialize_path = try std.mem.concat(allocator, u8, &.{ temp_test_path, "/save.data" });
@@ -31,14 +32,17 @@ test "object data db read and write test" {
         var data_db_inst = data_db.ObjectDataDB.init(allocator);
         defer data_db_inst.deinit();
 
-        var simple = SimpleStruct{ .num = 99 };
+        const test_message = try allocator.dupe(u8, "Message");
+        defer allocator.free(test_message);
+
+        var simple = SimpleStruct{ .num = 99, .text = test_message };
         const simple_object = try data_db_inst.createObject(.{ .name = "Simple" });
         try data_db_inst.copyObjectFromType(SimpleStruct, &simple, simple_object);
         const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
         try std.testing.expect(simple_object_prop != null);
         try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
 
-        const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66 }, .{ .name = "Simple2" });
+        const simple_object2 = try data_db_inst.createObjectFromType(SimpleStruct, &.{ .num = 66, .text = test_message }, .{ .name = "Simple2" });
         try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
 
         try data_db_inst.serialize(.{ .file_path = binary_serialize_path, .mode = .binary });
@@ -63,11 +67,14 @@ test "object data db read and write test" {
         const simple_object2 = try data_db_inst.findOrAddObject(.{ .name = "Simple2" });
         try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
 
-        var simple = SimpleStruct{ .num = undefined };
+        var simple = SimpleStruct{ .num = undefined, .text = undefined };
         try data_db_inst.copyTypeFromObject(simple_object, SimpleStruct, &simple);
         try std.testing.expectEqual(99, simple.num);
-        var simple2 = SimpleStruct{ .num = undefined };
+        try std.testing.expectEqualStrings("Message", simple.text);
+        var simple2 = SimpleStruct{ .num = undefined, .text = undefined };
         try data_db_inst.copyTypeFromObject(simple_object2, SimpleStruct, &simple2);
         try std.testing.expectEqual(66, simple2.num);
+        allocator.free(simple.text);
+        allocator.free(simple2.text);
     }
 }
