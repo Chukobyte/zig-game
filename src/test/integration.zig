@@ -33,7 +33,7 @@ test "object data db read and write test" {
 
         var simple = SimpleStruct{ .num = 99 };
         const simple_object = try data_db_inst.createObject(.{ .name = "Simple" });
-        try data_db_inst.serializeTypeIntoObject(SimpleStruct, &simple, simple_object);
+        try data_db_inst.copyObjectFromType(SimpleStruct, &simple, simple_object);
         const simple_object_prop = data_db_inst.findProperty(simple_object, "num");
         try std.testing.expect(simple_object_prop != null);
         try std.testing.expectEqual(99, simple_object_prop.?.value.integer);
@@ -62,5 +62,12 @@ test "object data db read and write test" {
 
         const simple_object2 = try data_db_inst.findOrAddObject(.{ .name = "Simple2" });
         try std.testing.expectEqual(66, data_db_inst.findProperty(simple_object2, "num").?.value.integer);
+
+        var simple = SimpleStruct{ .num = undefined };
+        try data_db_inst.copyTypeFromObject(simple_object, SimpleStruct, &simple);
+        try std.testing.expectEqual(99, simple.num);
+        var simple2 = SimpleStruct{ .num = undefined };
+        try data_db_inst.copyTypeFromObject(simple_object2, SimpleStruct, &simple2);
+        try std.testing.expectEqual(66, simple2.num);
     }
 }

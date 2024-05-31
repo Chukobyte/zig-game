@@ -197,15 +197,25 @@ pub const ObjectDataDB = struct {
 
     pub fn createObjectFromType(self: *@This(), comptime T: type, value: *const T, params: CreateObjectParams) std.mem.Allocator.Error!*Object {
         const obj: *Object = self.findObject(params.name) orelse try self.createObject(params);
-        try self.serializeTypeIntoObject(T, value, obj);
+        try self.copyObjectFromType(T, value, obj);
         return obj;
     }
 
-    pub fn serializeTypeIntoObject(self: *@This(), comptime T: type, value: *const T, object: *Object) !void {
+    pub fn copyObjectFromType(self: *@This(), comptime T: type, value: *const T, object: *Object) !void {
         self.clearObject(object);
         inline for (@typeInfo(T).Struct.fields) |field| {
             if (comptime isValidPropertyType(field.type)) {
                 try self.writeProperty(object, field.name, field.type, @field(value, field.name));
+            }
+        }
+    }
+
+    pub fn copyTypeFromObject(self: *@This(), object: *const Object, comptime T: type, value: *T) !void {
+        inline for (@typeInfo(T).Struct.fields) |field| {
+            if (comptime isValidPropertyType(field.type)) {
+                if (self.readProperty(object, field.name, field.type) catch null) |read_value| {
+                    @field(value, field.name) = read_value;
+                }
             }
         }
     }
@@ -338,6 +348,10 @@ pub const ObjectDataDB = struct {
             }
         }
         return ObjectError.FailedToFindProperty;
+    }
+
+    pub fn readPropertyUnchecked(self: *@This(), object: *const Object, key: []const u8, comptime T: type) ?T {
+        return self.readProperty(object, key, T) catch return null;
     }
 
     pub fn findProperty(self: *@This(), object: *const Object, key: []const u8) ?*Property {
