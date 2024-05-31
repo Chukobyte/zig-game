@@ -72,6 +72,7 @@ pub const Object = struct {
     name: []u8,
     properties: std.ArrayList(Property),
     subobjects: std.ArrayList(*Object),
+    parent: ?*Object = null,
 
     pub const Handle = struct {
         object: *Object,
@@ -89,7 +90,8 @@ pub const Object = struct {
 
 pub const ObjectDataDB = struct {
 
-    objects: std.ArrayList(Object), // All top root level objects
+    objects: std.ArrayList(Object), // All objects
+    root_objects: std.ArrayList(*Object), // All top level root objects (no parents)
     allocator: std.mem.Allocator,
     object_ids_index: u32 = 1,
 
@@ -111,6 +113,7 @@ pub const ObjectDataDB = struct {
     pub fn init(allocator: std.mem.Allocator) @This() {
         return ObjectDataDB{
             .objects = std.ArrayList(Object).init(allocator),
+            .root_objects = std.ArrayList(*Object).init(allocator),
             .allocator = allocator,
         };
     }
@@ -120,6 +123,7 @@ pub const ObjectDataDB = struct {
             self.deleteObject(object); // TODO: Can use a more efficient code path but this if fine for now...
         }
         self.objects.deinit();
+        self.root_objects.deinit();
     }
 
     pub fn serialize(self: *@This(), params: SerializeParams) !void {
@@ -127,7 +131,7 @@ pub const ObjectDataDB = struct {
         const file_path = params.file_path;
         const write_mode = params.mode;
 
-        const objects_list = ObjectsList{ .objects = self.objects.items[0..] };
+        const objects_list = ObjectsListT(*Object){ .objects = self.root_objects.items[0..] };
         const file = try std.fs.createFileAbsolute(file_path, .{});
         defer file.close();
 
@@ -142,7 +146,7 @@ pub const ObjectDataDB = struct {
                 std.mem.copyForwards(u8, bytes[@sizeOf(SizeT)..], json_string); // Serialize the json string
                 _ = try file.write(bytes);
             },
-            .json => { try file.writeAll(json_string); },
+            .json => try file.writeAll(json_string),
         }
     }
 
@@ -176,6 +180,10 @@ pub const ObjectDataDB = struct {
         new_object.name = try self.allocator.dupe(u8, name);
         new_object.properties = std.ArrayList(Property).init(self.allocator);
         new_object.subobjects = std.ArrayList(*Object).init(self.allocator);
+        new_object.parent = null;
+        if (new_object.parent == null) {
+            try self.root_objects.append(new_object);
+        }
         self.object_ids_index += 1;
         return new_object;
     }
@@ -241,6 +249,17 @@ pub const ObjectDataDB = struct {
         object.properties.deinit();
         object.subobjects.deinit();
         self.allocator.free(object.name);
+        if (object.parent != null) {
+            var found_index: ?u32 = null;
+            for (self.root_objects.items) |obj| {
+                if (obj.id == object.id) {
+                    found_index = obj.id;
+                }
+            }
+            if (found_index) |index| {
+                _ = self.root_objects.swapRemove(index);
+            }
+        }
         ArrayListUtils.removeByValue(Object, &self.objects, object);
     }
 
@@ -379,263 +398,271 @@ pub const ObjectDataDB = struct {
     }
 };
 
-pub const ObjectsList = struct {
-    objects: []Object = undefined,
+pub fn ObjectsListT(comptime ObjectT: type) type {
+    return struct {
+        objects: []ObjectT = undefined,
 
-    pub fn jsonStringify(self: *const @This(), out: anytype) !void {
-        try out.beginObject();
-        try out.objectField("objects");
-        try out.beginArray();
-        for (self.objects) |*object| {
-            try jsonWriteObject(object, out);
-        }
-        try out.endArray();
-        try out.endObject();
-    }
-
-    pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !@This() {
-        if (.object_begin != try source.next()) { return error.UnexpectedToken; }
-
-        const objects = try jsonParseNextObjectsArray(alloc, source, options);
-
-        // Verify we parse all tokens
-        while (true) {
-            switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                .end_of_document => { break; },
-                else => {},
-            }
-        }
-
-        return @This(){ .objects = objects };
-    }
-
-    // Recursive
-    fn jsonWriteObject(object: *Object, out: anytype) !void {
-        try out.beginObject();
-
-        try out.objectField("name");
-        try out.write(object.name);
-        try out.objectField("id");
-        try out.write(object.id);
-        // Properties
-        try out.objectField("properties");
-        try out.beginArray();
-        for (object.properties.items) |*property| {
+        pub fn jsonStringify(self: *const @This(), out: anytype) !void {
             try out.beginObject();
-            try out.objectField("key");
-            try out.write(property.key);
-            try out.objectField("value");
-            switch (property.type) {
-                .boolean => try out.write(property.value.boolean),
-                .integer => try out.write(property.value.integer),
-                .float => try out.write(property.value.float),
-                .string => try out.write(property.value.string),
+            try out.objectField("objects");
+            try out.beginArray();
+            for (self.objects) |*object| {
+                if (comptime ObjectT == *Object) {
+                    try jsonWriteObject(object.*, out);
+                } else {
+                    try jsonWriteObject(object, out);
+                }
             }
+            try out.endArray();
             try out.endObject();
         }
-        try out.endArray();
 
-        // Subobjects
-        try out.objectField("subobjects");
-        try out.beginArray();
-        for (object.subobjects.items) |subobject| {
-            try jsonWriteObject(subobject, out);
-        }
-        try out.endArray();
+        pub fn jsonParse(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !@This() {
+            if (.object_begin != try source.next()) { return error.UnexpectedToken; }
 
-        try out.endObject();
-    }
+            const objects = try jsonParseNextObjectsArray(alloc, source, options);
 
-    fn jsonNextAlloc(comptime T: type, alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !T {
-        if (!isValidPropertyType(T) and T != []u8 and T != u32) { @compileError("value is not a value property type!"); }
-
-        const token: std.json.Token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-        switch (@typeInfo(T)) {
-            .Bool => {
-                switch (token) {
-                    .true => return true,
-                    .false => return false,
-                    else => unreachable,
-                }
-            },
-            .Int => {
-                switch (token) {
-                    .number, .partial_number, .allocated_number => |v| {
-                        const parsedInt = try std.fmt.parseInt(T, v, 10);
-                        if (token == .allocated_number) {
-                            alloc.free(token.allocated_number);
-                        }
-                        return parsedInt;
-                    },
-                    else => unreachable,
-                }
-            },
-            .Float => {
-                switch (token) {
-                    .number, .partial_number, .allocated_number => |v| {
-                        const parsedFloat = try std.fmt.parseFloat(T, v, 10);
-                        if (token == .allocated_number) {
-                            alloc.free(token.allocated_number);
-                        }
-                        return parsedFloat;
-                    },
-                    else => unreachable,
-                }
-            },
-            .Pointer => {
-                switch (token) {
-                    .string, .allocated_string => |v| {
-                        const parsedString = try alloc.dupe(u8, v);
-                        if (token == .allocated_string) {
-                            alloc.free(token.allocated_string);
-                        }
-                        return parsedString;
-                    },
-                    else => unreachable,
-                }
-            },
-            else => unreachable,
-        }
-    }
-
-    // Recursive
-    fn jsonParseNextObjectsArray(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) ![]Object {
-        const ObjectBuffer = struct {
-            data: [24]Object = undefined,
-            len: usize = 0,
-
-            pub fn add(self: *@This(), object: Object) void {
-                self.data[self.len] = object;
-                self.len += 1;
-            }
-
-            pub fn allocateSlice(self: *@This(), a: std.mem.Allocator) ![]Object {
-                const new_slice = try a.alloc(Object, self.len);
-                std.mem.copyForwards(Object, new_slice, self.data[0..self.len]);
-                return new_slice;
-            }
-        };
-
-        var object_buffer = ObjectBuffer{};
-        const objects_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-        if (!(objects_key_token == .string or objects_key_token == .allocated_string)) { std.debug.print("objects_key_token {any}\n", .{ objects_key_token }); unreachable; }
-        switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-            .array_begin => {},
-            else => unreachable,
-        }
-        while (true) {
-            // Object begin
-            switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                .object_begin => {},
-                .array_end => return object_buffer.allocateSlice(alloc), // Empty object array
-                else => unreachable,
-            }
-            // Parse Name
-            var object_name: []u8 = undefined;
-            const name_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-            if (!(name_key_token == .string or name_key_token == .allocated_string)) { unreachable; }
-            const name_value_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
-            switch (name_value_token) {
-                .string, .allocated_string => |v| { object_name = try alloc.dupe(u8, v); },
-                else => unreachable,
-            }
-            // Parse Id
-            const id_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
-            std.debug.assert(std.mem.eql(u8, "id", id_key));
-            defer alloc.free(id_key);
-            const object_id: u32 = try jsonNextAlloc(u32, alloc, source, options);
-
-            // Parse properties
-            var properties_array: [16]Property = undefined;
-            var properties_count: usize = 0;
-            {
-                // First parse properties key token
-                const prop_array_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
-                std.debug.assert(std.mem.eql(u8, "properties", prop_array_key));
-                defer alloc.free(prop_array_key);
-                // Now parse array
+            // Verify we parse all tokens
+            while (true) {
                 switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                    .array_begin => {},
-                    else => unreachable,
+                    .end_of_document => { break; },
+                    else => {},
                 }
-                // Now parse properties
-                parse_objects: while (true) {
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .object_begin => {},
-                        .array_end => break :parse_objects, // Stop parsing properties since we reached end of array
+            }
+
+            return @This(){ .objects = objects };
+        }
+
+        // Recursive
+        fn jsonWriteObject(object: *Object, out: anytype) !void {
+            try out.beginObject();
+
+            try out.objectField("name");
+            try out.write(object.name);
+            try out.objectField("id");
+            try out.write(object.id);
+            // Properties
+            try out.objectField("properties");
+            try out.beginArray();
+            for (object.properties.items) |*property| {
+                try out.beginObject();
+                try out.objectField("key");
+                try out.write(property.key);
+                try out.objectField("value");
+                switch (property.type) {
+                    .boolean => try out.write(property.value.boolean),
+                    .integer => try out.write(property.value.integer),
+                    .float => try out.write(property.value.float),
+                    .string => try out.write(property.value.string),
+                }
+                try out.endObject();
+            }
+            try out.endArray();
+
+            // Subobjects
+            try out.objectField("subobjects");
+            try out.beginArray();
+            for (object.subobjects.items) |subobject| {
+                try jsonWriteObject(subobject, out);
+            }
+            try out.endArray();
+
+            try out.endObject();
+        }
+
+        fn jsonNextAlloc(comptime T: type, alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) !T {
+            if (!isValidPropertyType(T) and T != []u8 and T != u32) { @compileError("value is not a value property type!"); }
+
+            const token: std.json.Token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
+            switch (@typeInfo(T)) {
+                .Bool => {
+                    switch (token) {
+                        .true => return true,
+                        .false => return false,
                         else => unreachable,
                     }
-                    var property: Property = Property{ .key = undefined, .type = undefined, .value = undefined };
-                    // Parse key key
-                    const prop_key_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
-                    std.debug.assert(std.mem.eql(u8, "key", prop_key_key));
-                    defer alloc.free(prop_key_key);
-                    // Parse key value
-                    property.key = try jsonNextAlloc([]u8, alloc, source, options);
-                    // Parse value key
-                    const prop_key_value: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
-                    std.debug.assert(std.mem.eql(u8, "value", prop_key_value));
-                    defer alloc.free(prop_key_value);
-                    // Parse value value
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .true => {
-                            property.type = .boolean;
-                            property.value = PropertyValue{ .boolean = true };
-                        },
-                        .false => {
-                            property.type = .boolean;
-                            property.value = PropertyValue{ .boolean = false };
-                        },
-                        .string, .allocated_string => |v| {
-                            property.type = .string;
-                            property.value = PropertyValue{ .string = try alloc.dupe(u8, v) };
-                        },
+                },
+                .Int => {
+                    switch (token) {
                         .number, .partial_number, .allocated_number => |v| {
-                            if(std.json.isNumberFormattedLikeAnInteger(v)) {
-                                property.type = .integer;
-                                property.value = PropertyValue{ .integer = try std.fmt.parseInt(i32, v, 10) };
-                            } else {
-                                property.type = .float;
-                                property.value = PropertyValue{ .float = try std.fmt.parseFloat(f32, v) };
+                            const parsedInt = try std.fmt.parseInt(T, v, 10);
+                            if (token == .allocated_number) {
+                                alloc.free(token.allocated_number);
                             }
+                            return parsedInt;
                         },
                         else => unreachable,
                     }
-                    property.has_ever_been_written_to = true;
-                    properties_array[properties_count] = property;
-                    properties_count += 1;
-                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                        .object_end => {},
+                },
+                .Float => {
+                    switch (token) {
+                        .number, .partial_number, .allocated_number => |v| {
+                            const parsedFloat = try std.fmt.parseFloat(T, v, 10);
+                            if (token == .allocated_number) {
+                                alloc.free(token.allocated_number);
+                            }
+                            return parsedFloat;
+                        },
                         else => unreachable,
                     }
-                }
-            }
-            const properties_slice = properties_array[0..properties_count];
-
-            // Parse subobjects
-            const subobjects_slice = try jsonParseNextObjectsArray(alloc, source, options);
-
-            // Create game object and add to buffer
-            var new_object = Object{ .name = object_name, .id = object_id, .properties = std.ArrayList(Property).init(alloc), .subobjects = std.ArrayList(*Object).init(alloc) };
-            // Add properties
-            for (properties_slice) |prop| {
-                try new_object.properties.append(prop);
-            }
-            // Add subobjects
-            for (subobjects_slice) |object| {
-                const copied_object = try alloc.create(Object);
-                copied_object.* = object;
-                try new_object.subobjects.append(copied_object);
-            }
-            object_buffer.add(new_object);
-
-            // Object End
-            switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
-                .object_end => {},
-                .array_end => break,
+                },
+                .Pointer => {
+                    switch (token) {
+                        .string, .allocated_string => |v| {
+                            const parsedString = try alloc.dupe(u8, v);
+                            if (token == .allocated_string) {
+                                alloc.free(token.allocated_string);
+                            }
+                            return parsedString;
+                        },
+                        else => unreachable,
+                    }
+                },
                 else => unreachable,
             }
         }
-        return object_buffer.allocateSlice(alloc);
-    }
-};
+
+        // Recursive
+        fn jsonParseNextObjectsArray(alloc: std.mem.Allocator, source: anytype, options: std.json.ParseOptions) ![]Object {
+            const ObjectBuffer = struct {
+                data: [24]Object = undefined,
+                len: usize = 0,
+
+                pub fn add(self: *@This(), object: Object) void {
+                    self.data[self.len] = object;
+                    self.len += 1;
+                }
+
+                pub fn allocateSlice(self: *@This(), a: std.mem.Allocator) ![]Object {
+                    const new_slice = try a.alloc(Object, self.len);
+                    std.mem.copyForwards(Object, new_slice, self.data[0..self.len]);
+                    return new_slice;
+                }
+            };
+
+            var object_buffer = ObjectBuffer{};
+            const objects_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
+            if (!(objects_key_token == .string or objects_key_token == .allocated_string)) { std.debug.print("objects_key_token {any}\n", .{ objects_key_token }); unreachable; }
+            switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                .array_begin => {},
+                else => unreachable,
+            }
+            while (true) {
+                // Object begin
+                switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                    .object_begin => {},
+                    .array_end => return object_buffer.allocateSlice(alloc), // Empty object array
+                    else => unreachable,
+                }
+                // Parse Name
+                var object_name: []u8 = undefined;
+                const name_key_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
+                if (!(name_key_token == .string or name_key_token == .allocated_string)) { unreachable; }
+                const name_value_token = try source.nextAlloc(alloc, options.allocate orelse .alloc_always);
+                switch (name_value_token) {
+                    .string, .allocated_string => |v| { object_name = try alloc.dupe(u8, v); },
+                    else => unreachable,
+                }
+                // Parse Id
+                const id_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                std.debug.assert(std.mem.eql(u8, "id", id_key));
+                defer alloc.free(id_key);
+                const object_id: u32 = try jsonNextAlloc(u32, alloc, source, options);
+
+                // Parse properties
+                var properties_array: [16]Property = undefined;
+                var properties_count: usize = 0;
+                {
+                    // First parse properties key token
+                    const prop_array_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                    std.debug.assert(std.mem.eql(u8, "properties", prop_array_key));
+                    defer alloc.free(prop_array_key);
+                    // Now parse array
+                    switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                        .array_begin => {},
+                        else => unreachable,
+                    }
+                    // Now parse properties
+                    parse_objects: while (true) {
+                        switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                            .object_begin => {},
+                            .array_end => break :parse_objects, // Stop parsing properties since we reached end of array
+                            else => unreachable,
+                        }
+                        var property: Property = Property{ .key = undefined, .type = undefined, .value = undefined };
+                        // Parse key key
+                        const prop_key_key: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                        std.debug.assert(std.mem.eql(u8, "key", prop_key_key));
+                        defer alloc.free(prop_key_key);
+                        // Parse key value
+                        property.key = try jsonNextAlloc([]u8, alloc, source, options);
+                        // Parse value key
+                        const prop_key_value: []u8 = try jsonNextAlloc([]u8, alloc, source, options);
+                        std.debug.assert(std.mem.eql(u8, "value", prop_key_value));
+                        defer alloc.free(prop_key_value);
+                        // Parse value value
+                        switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                            .true => {
+                                property.type = .boolean;
+                                property.value = PropertyValue{ .boolean = true };
+                            },
+                            .false => {
+                                property.type = .boolean;
+                                property.value = PropertyValue{ .boolean = false };
+                            },
+                            .string, .allocated_string => |v| {
+                                property.type = .string;
+                                property.value = PropertyValue{ .string = try alloc.dupe(u8, v) };
+                            },
+                            .number, .partial_number, .allocated_number => |v| {
+                                if(std.json.isNumberFormattedLikeAnInteger(v)) {
+                                    property.type = .integer;
+                                    property.value = PropertyValue{ .integer = try std.fmt.parseInt(i32, v, 10) };
+                                } else {
+                                    property.type = .float;
+                                    property.value = PropertyValue{ .float = try std.fmt.parseFloat(f32, v) };
+                                }
+                            },
+                            else => unreachable,
+                        }
+                        property.has_ever_been_written_to = true;
+                        properties_array[properties_count] = property;
+                        properties_count += 1;
+                        switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                            .object_end => {},
+                            else => unreachable,
+                        }
+                    }
+                }
+                const properties_slice = properties_array[0..properties_count];
+
+                // Parse subobjects
+                const subobjects_slice = try jsonParseNextObjectsArray(alloc, source, options);
+
+                // Create game object and add to buffer
+                var new_object = Object{ .name = object_name, .id = object_id, .properties = std.ArrayList(Property).init(alloc), .subobjects = std.ArrayList(*Object).init(alloc) };
+                // Add properties
+                for (properties_slice) |prop| {
+                    try new_object.properties.append(prop);
+                }
+                // Add subobjects
+                for (subobjects_slice) |object| {
+                    const copied_object = try alloc.create(Object);
+                    copied_object.* = object;
+                    try new_object.subobjects.append(copied_object);
+                }
+                object_buffer.add(new_object);
+
+                // Object End
+                switch (try source.nextAlloc(alloc, options.allocate orelse .alloc_always)) {
+                    .object_end => {},
+                    .array_end => break,
+                    else => unreachable,
+                }
+            }
+            return object_buffer.allocateSlice(alloc);
+        }
+    };
+}
+
+pub const ObjectsList = ObjectsListT(Object);
