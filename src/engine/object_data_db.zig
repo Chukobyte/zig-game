@@ -158,9 +158,7 @@ pub const ObjectDataDB = struct {
         defer self.allocator.free(bytes);
 
         const json_string = switch (read_mode) {
-            .binary => blk: {
-                break :blk bytes[@sizeOf(SizeT)..];
-            },
+            .binary => bytes[@sizeOf(SizeT)..],
             .json => bytes,
         };
 
