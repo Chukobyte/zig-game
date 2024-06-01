@@ -30,33 +30,24 @@ const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const ColliderComponent = comps.ColliderComponent;
 const TextLabelComponent = comps.TextLabelComponent;
+const UIWidgetComponent = comps.UIWidgetComponent;
 
 pub const SpriteButtonInterface = struct {
     pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
         _ = self;
-        const trans_comp = context.getComponent(entity, TransformComponent).?;
         const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        const collider_comp = context.getComponent(entity, ColliderComponent).?;
+        const widget_comp = context.getComponent(entity, UIWidgetComponent).?;
 
-        const transform = trans_comp.transform;
         var sprite = &sprite_comp.sprite;
-        const collider = collider_comp.collider;
-        const world_mouse_pos: Vec2 = game.getWorldMousePos();
-        const entity_collider = Rect2{
-            .x = transform.position.x + collider.x,
-            .y = transform.position.y + collider.y,
-            .w = collider.w,
-            .h = collider.h
-        };
-        const mouse_collider: Rect2 = .{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
-        if (entity_collider.doesOverlap(&mouse_collider)) {
-            if (zeika.isKeyPressed(.mouse_button_left, 0)) {
+        if (widget_comp.is_hovered) {
+            const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
+            if (button.is_pressed) {
                 sprite.modulate = Color.White;
             } else {
                 sprite.modulate = Color.Red;
             }
 
-            if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
+            if (button.was_just_pressed) {
                 if (context.getEntityByTag("text_label")) |text_label_entity| {
                     if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
                         var persistent_state = PersistentState.get();

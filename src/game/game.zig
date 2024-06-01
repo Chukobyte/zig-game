@@ -30,6 +30,7 @@ const Camera = core.Camera;
 const MainSystem = ec_systems.MainSystem;
 const SpriteRenderingSystem = ec_systems.SpriteRenderingSystem;
 const TextRenderingSystem = ec_systems.TextRenderingSystem;
+const UISystem = ec_systems.UISystem;
 
 const PersistentState = state.PersistentState;
 
@@ -40,6 +41,9 @@ const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const ColliderComponent = comps.ColliderComponent;
+const UIWidgetComponent = comps.UIWidgetComponent;
+const OnMouseHoveredEvent = UIWidgetComponent.OnMouseHoveredEvent;
+const OnMouseUnhoveredEvent = UIWidgetComponent.OnMouseUnhoveredEvent;
 
 pub const GameProperties = struct {
     title: []const u8 = "ZigTest",
@@ -51,8 +55,8 @@ var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
     .entity_interfaces = &.{ SpriteButtonInterface, EnergyTextLabelInterface },
-    .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent },
-    .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem },
+    .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
+    .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
 
 var is_game_running = false;
@@ -118,7 +122,13 @@ pub fn run() !void {
                     .modulate = Color.Blue
                 },
             });
-            try self.ecs_context.setComponent(sprite_button_entity, ColliderComponent, &.{ .collider = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 } });
+            try self.ecs_context.setComponent(sprite_button_entity, UIWidgetComponent, &.{
+                .widget = .{ .button = .{} },
+                .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
+            });
+            var widget_comp: *UIWidgetComponent = self.ecs_context.getComponent(sprite_button_entity, UIWidgetComponent).?;
+            widget_comp.on_mouse_hovered = OnMouseHoveredEvent.init(self.allocator);
+            widget_comp.on_mouse_unhovered = OnMouseUnhoveredEvent.init(self.allocator);
 
             const text_label_entity = try self.ecs_context.initEntity(.{ .interface = EnergyTextLabelInterface, .tags = &.{ "text_label" } });
             try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });

@@ -405,7 +405,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             self.entities_queued_for_deletion.clearAndFree();
         }
 
-        pub fn event(self: *@This(), comptime event_type: EventType) void {
+        // --- Events --- //
+        // TODO: Make this generic to also be extended to the user to add events
+
+        pub inline fn event(self: *@This(), comptime event_type: EventType) void {
             switch (event_type) {
                 .idle_increment => self.idleIncrement(),
                 .tick => self.tick(),
