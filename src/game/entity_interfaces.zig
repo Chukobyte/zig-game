@@ -32,6 +32,20 @@ const ColliderComponent = comps.ColliderComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const UIWidgetComponent = comps.UIWidgetComponent;
 
+pub const StatBarInterface = struct {
+    const energy_per_increment = 1;
+
+    pub fn idleIncrement(_: *@This(), context: *ECSContext, entity: Entity) void {
+        if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
+            var persistent_state = PersistentState.get();
+            persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
+            text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
+        }
+    }
+
+    pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
+};
+
 pub const SpriteButtonInterface = struct {
     pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
         _ = self;
@@ -62,18 +76,4 @@ pub const SpriteButtonInterface = struct {
     }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, ColliderComponent }; }
-};
-
-pub const EnergyTextLabelInterface = struct {
-    pub fn idleIncrement(self: *@This(), context: *ECSContext, entity: Entity) void {
-        _ = self;
-        const energyPerIncrement = 1;
-        if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
-            var persistent_state = PersistentState.get();
-            persistent_state.energy.addScalar(&persistent_state.energy, energyPerIncrement) catch unreachable;
-            text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
-        }
-    }
-
-    pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
 };

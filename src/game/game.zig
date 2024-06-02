@@ -35,7 +35,7 @@ const UISystem = ec_systems.UISystem;
 const PersistentState = state.PersistentState;
 
 const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
-const EnergyTextLabelInterface = entity_interfaces.EnergyTextLabelInterface;
+const StatBarInterface = entity_interfaces.StatBarInterface;
 
 const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
@@ -54,7 +54,7 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ SpriteButtonInterface, EnergyTextLabelInterface },
+    .entity_interfaces = &.{ SpriteButtonInterface, StatBarInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
@@ -112,31 +112,49 @@ pub fn run() !void {
         }
 
         pub fn setupInitialScene(self: *@This()) !void {
-            const sprite_button_entity = try self.ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
-            try self.ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
-            try self.ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
-                .sprite = .{
-                    .texture = self.texture_handle,
-                    .size = .{ .x = 64.0, .y = 64.0 },
-                    .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                    .modulate = Color.Blue
-                },
-            });
-            try self.ecs_context.setComponent(sprite_button_entity, UIWidgetComponent, &.{
-                .widget = .{ .button = .{} },
-                .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
-            });
-            var widget_comp: *UIWidgetComponent = self.ecs_context.getComponent(sprite_button_entity, UIWidgetComponent).?;
-            widget_comp.on_mouse_hovered = OnMouseHoveredEvent.init(self.allocator);
-            widget_comp.on_mouse_unhovered = OnMouseUnhoveredEvent.init(self.allocator);
+            // TODO: Start using ui components for positioning
+            // Stat bar
+            {
+                const stat_bar_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "stat_bar" } });
+                try self.ecs_context.setComponent(stat_bar_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
+                try self.ecs_context.setComponent(stat_bar_entity, SpriteComponent, &.{
+                    .sprite = .{
+                        .texture = self.texture_handle,
+                        .size = .{ .x = @floatFromInt(game_properties.resolution.x), .y = 32 },
+                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                        .modulate = Color.Blue
+                    },
+                });
 
-            const text_label_entity = try self.ecs_context.initEntity(.{ .interface = EnergyTextLabelInterface, .tags = &.{ "text_label" } });
-            try self.ecs_context.setComponent(text_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 200.0 } } });
-            try self.ecs_context.setComponent(text_label_entity, TextLabelComponent, &.{ .text_label = .{
-                .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
-            });
-            if (self.ecs_context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                try text_label_comp.text_label.text.set("Energy: 0", .{});
+                const energy_label_entity = try self.ecs_context.initEntity(.{ .interface = StatBarInterface, .tags = &.{ "text_label" } });
+                try self.ecs_context.setComponent(energy_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 10.0, .y = 20.0 } } });
+                try self.ecs_context.setComponent(energy_label_entity, TextLabelComponent, &.{ .text_label = .{
+                    .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
+                });
+                if (self.ecs_context.getComponent(energy_label_entity, TextLabelComponent)) |text_label_comp| {
+                    try text_label_comp.text_label.text.set("Energy: 0", .{});
+                }
+            }
+
+            // Temp test sprite button widget
+            {
+                const sprite_button_entity = try self.ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
+                try self.ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
+                try self.ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
+                    .sprite = .{
+                        .texture = self.texture_handle,
+                        .size = .{ .x = 64.0, .y = 64.0 },
+                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                        .modulate = Color.Blue
+                    },
+                });
+                try self.ecs_context.setComponent(sprite_button_entity, UIWidgetComponent, &.{
+                    .widget = .{ .button = .{} },
+                    .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
+                });
+                var widget_comp: *UIWidgetComponent = self.ecs_context.getComponent(sprite_button_entity, UIWidgetComponent).?;
+                widget_comp.on_mouse_hovered = OnMouseHoveredEvent.init(self.allocator);
+                widget_comp.on_mouse_unhovered = OnMouseUnhoveredEvent.init(self.allocator);
             }
         }
     };
