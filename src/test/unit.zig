@@ -27,20 +27,21 @@ const TestEntityInterface = struct {
     var has_called_init = false;
     var has_called_deinit = false;
     var has_called_tick = false;
+    var has_called_idle_increment = false;
 
-    pub fn init(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
-        _ = self; _ = context; _ = entity;
+    pub fn init(_: *TestEntityInterface, _: *ECSContext, _: ECSContext.Entity) void {
         has_called_init = true;
     }
-    pub fn deinit(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
-        _ = self; _ = context; _ = entity;
+    pub fn deinit(_: *TestEntityInterface, _: *ECSContext, _: ECSContext.Entity) void {
         has_called_deinit = true;
     }
-    pub fn tick(self: *TestEntityInterface, context: *ECSContext, entity: ECSContext.Entity) void {
-        _ = self; _ = context; _ = entity;
+    pub fn tick(_: *TestEntityInterface, _: *ECSContext, _: ECSContext.Entity) void {
         has_called_tick = true;
     }
-    };
+    pub fn idleIncrement(_: *TestEntityInterface, _: *ECSContext, _: ECSContext.Entity) void {
+        has_called_idle_increment = true;
+    }
+};
 
 const TestECSystem = struct {
     var has_called_init = false;
@@ -219,6 +220,9 @@ test "ecs test" {
     try std.testing.expectEqual(false, TestEntityInterface.has_called_tick);
     ecs_context.event(.tick);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_tick);
+    try std.testing.expectEqual(false, TestEntityInterface.has_called_idle_increment);
+    ecs_context.event(.idle_increment);
+    try std.testing.expectEqual(true, TestEntityInterface.has_called_idle_increment);
     ecs_context.deinitEntity(new_entity);
     try std.testing.expectEqual(false, ecs_context.isEntityValid(new_entity));
     try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);

@@ -155,22 +155,21 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         pub const Entity = EntityIdType;
         pub const Tags = TagList(max_tags);
 
+        /// Instance data for user defined mapping of entity instance types to entities used for ticking
+        const EntityInterfaceData = struct {
+            interface_id: usize,
+            instance: *anyopaque,
+        };
+
         /// Entity data that exists outside of components
         pub const EntityData = struct {
             components: [component_types.len]?*anyopaque = undefined,
-            interface_instance: ?*anyopaque = null,
+            interface: ?EntityInterfaceData = null,
             tag_list: Tags = .{},
             component_signature: TypeBitMask(component_types) = .{},
             is_valid: bool = false,
             is_in_system_map: [system_types.len]bool = undefined,
             is_in_archetype_map: [archetype_count]bool = undefined,
-        };
-
-        /// Instance data for user defined mapping of entity instance types to entities used for ticking
-        const InterfaceTickData = struct {
-            interface_id: usize,
-            entity: Entity,
-            instance: *anyopaque,
         };
 
         /// System related stuff
@@ -283,8 +282,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         entity_data_list: std.ArrayList(EntityData),
         system_data_list: std.ArrayList(ECSystemData),
         archetype_data_list: [archetype_count]ArchetypeData,
-        entity_interface_idle_increment_data_list: std.ArrayList(InterfaceTickData),
-        entity_interface_tick_data_list: std.ArrayList(InterfaceTickData),
+        entity_interface_idle_increment_data_list: std.ArrayList(Entity),
+        entity_interface_tick_data_list: std.ArrayList(Entity),
         entities_queued_for_deletion: std.ArrayList(Entity),
         entity_id_counter: Entity = @as(Entity, 0),
 
@@ -294,8 +293,8 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 .entity_data_list = std.ArrayList(EntityData).init(allocator),
                 .system_data_list = try std.ArrayList(ECSystemData).initCapacity(allocator, system_type_list.len),
                 .archetype_data_list = undefined,
-                .entity_interface_idle_increment_data_list = std.ArrayList(InterfaceTickData).init(allocator),
-                .entity_interface_tick_data_list = std.ArrayList(InterfaceTickData).init(allocator),
+                .entity_interface_idle_increment_data_list = std.ArrayList(Entity).init(allocator),
+                .entity_interface_tick_data_list = std.ArrayList(Entity).init(allocator),
                 .entities_queued_for_deletion = std.ArrayList(Entity).init(allocator),
             };
 
@@ -386,10 +385,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
-                        if (entity_data.interface_instance) |interface_instance| {
-                            const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
+                        if (entity_data.interface) |interface| {
+                            const interface_ptr: *T = @alignCast(@ptrCast(interface.instance));
                             self.allocator.destroy(interface_ptr);
-                            entity_data.interface_instance = null;
+                            entity_data.interface = null;
                         }
                     }
                 }
@@ -417,12 +416,15 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         fn idleIncrement(self: *@This()) void {
-            for (self.entity_interface_idle_increment_data_list.items) |*entity_tick_data| {
+            for (self.entity_interface_idle_increment_data_list.items) |entity| {
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (@hasDecl(T, "idleIncrement")) {
-                        const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
-                        interface_ptr.idleIncrement(self, entity_tick_data.entity);
+                        const interface_data = &self.entity_data_list.items[entity].interface.?;
+                        if (interface_data.interface_id == i) {
+                            const interface_ptr: *T = @alignCast(@ptrCast(interface_data.instance));
+                            interface_ptr.idleIncrement(self, entity);
+                        }
                     }
                 }
             }
@@ -449,12 +451,16 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             }
 
             // Tick entities
-            for (self.entity_interface_tick_data_list.items) |*entity_tick_data| {
+            for (self.entity_interface_tick_data_list.items) |entity| {
+                const entity_tick_data = &self.entity_data_list.items[entity];
                 inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (@hasDecl(T, "tick")) {
-                        const interface_ptr: *T = @alignCast(@ptrCast(entity_tick_data.instance));
-                        interface_ptr.tick(self, entity_tick_data.entity);
+                        const interface = entity_tick_data.interface.?;
+                        if (interface.interface_id == i) {
+                            const interface_ptr: *T = @alignCast(@ptrCast(interface.instance));
+                            interface_ptr.tick(self, entity);
+                        }
                     }
                 }
             }
@@ -528,17 +534,17 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 if (@hasDecl(T, "init")) {
                     new_interface.init(self, new_entity);
                 }
-                entity_data.interface_instance = new_interface;
+                entity_data.interface = .{ .interface_id = entity_interface_type_list.getIndex(T), .instance = new_interface };
 
                 if (@hasDecl(T, "idleIncrement")) {
-                    try self.entity_interface_idle_increment_data_list.append(InterfaceTickData{ .interface_id = entity_interface_type_list.getIndex(T), .entity = new_entity, .instance = new_interface });
+                    try self.entity_interface_idle_increment_data_list.append(new_entity);
                 }
 
                 if (@hasDecl(T, "tick")) {
-                    try self.entity_interface_tick_data_list.append(InterfaceTickData{ .interface_id = entity_interface_type_list.getIndex(T), .entity = new_entity, .instance = new_interface });
+                    try self.entity_interface_tick_data_list.append(new_entity);
                 }
             } else {
-                entity_data.interface_instance = null;
+                entity_data.interface = null;
             }
 
             if (params.tags) |tags| {
@@ -560,26 +566,18 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const entity_data: *EntityData = &self.entity_data_list.items[entity];
                 entity_data.component_signature.unsetAll();
                 self.refreshArchetypeState(entity) catch {}; // Not worried about error
-                inline for (0..entity_interface_types.len) |i| {
-                    const T: type = entity_interface_type_list.getType(i);
-                    if (T == entity_interface_types[i]) {
-                        if (entity_data.interface_instance) |interface_instance| {
-                            if (@hasDecl(T, "idleIncrement")) {
-                                ArrayListUtils.removeByPred(InterfaceTickData, &self.entity_interface_idle_increment_data_list, &InterfaceTickData{ .interface_id = i, .instance = undefined, .entity = entity }, struct {
-                                    pub fn find(original: *const InterfaceTickData, value: *const InterfaceTickData) bool {
-                                        return original.entity == value.entity;
-                                    }
-                                }.find);
-                            }
-                            if (@hasDecl(T, "tick")) {
-                                ArrayListUtils.removeByPred(InterfaceTickData, &self.entity_interface_tick_data_list, &InterfaceTickData{ .interface_id = i, .instance = undefined, .entity = entity }, struct {
-                                    pub fn find(original: *const InterfaceTickData, value: *const InterfaceTickData) bool {
-                                        return original.entity == value.entity;
-                                    }
-                                }.find);
-                            }
-                            if (@hasDecl(T, "deinit")) {
-                                const interface_ptr: *T = @alignCast(@ptrCast(interface_instance));
+                if (entity_data.interface) |interface| {
+                    inline for (0..entity_interface_types.len) |i| {
+                        const T: type = entity_interface_type_list.getType(i);
+                        if (@hasDecl(T, "idleIncrement")) {
+                            ArrayListUtils.removeByValue(Entity, &self.entity_interface_idle_increment_data_list, &entity);
+                        }
+                        if (@hasDecl(T, "tick")) {
+                            ArrayListUtils.removeByValue(Entity, &self.entity_interface_tick_data_list, &entity);
+                        }
+                        if (@hasDecl(T, "deinit")) {
+                            if (entity_data.interface.?.interface_id == i) {
+                                const interface_ptr: *T = @alignCast(@ptrCast(interface.instance));
                                 interface_ptr.deinit(self, entity);
                             }
                         }

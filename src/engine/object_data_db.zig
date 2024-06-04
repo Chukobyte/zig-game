@@ -233,7 +233,6 @@ pub const ObjectDataDB = struct {
 
     pub fn copyObject(self: *@This(), dest: *Object, src: *const Object) !void {
         dest.id = src.id;
-        // dest.name = try self.allocator.dupe(u8, src.name);
         for (src.properties.items) |prop| {
             try dest.properties.append(prop);
             dest.properties.items[dest.properties.items.len - 1].key = try self.allocator.dupe(u8, prop.key);
@@ -384,9 +383,7 @@ pub const ObjectDataDB = struct {
     }
 
     pub fn removeProperty(self: *@This(), object: *Object, property: *Property) void {
-        if (self.findProperty(object, property.key)) |found_prop| {
-            self.removePropertyByKey(object, found_prop.key);
-        }
+        self.removePropertyByKey(object, property.key);
     }
 
     pub fn removePropertyByKey(self: *@This(), object: *Object, key: []const u8) void {

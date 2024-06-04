@@ -38,7 +38,7 @@ pub const PersistentState = struct {
     }
 
     pub fn save(self: *@This()) !void {
-        const state_obj = try self.data_db.createObject(.{ .name = "state" });
+        const state_obj = try self.data_db.findOrAddObject(.{ .name = "state" });
         const energy_string = try self.energy.toString(self.allocator, 10, .upper);
         defer self.allocator.free(energy_string);
         try self.data_db.writeProperty(state_obj, "energy", []const u8, energy_string);

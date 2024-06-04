@@ -16,8 +16,7 @@ const TextLabelComponent = comps.TextLabelComponent;
 const UIWidgetComponent = comps.UIWidgetComponent;
 
 pub const MainSystem = struct {
-    pub fn preContextTick(self: *@This(), context: *ECSContext) void {
-        _ = self; _ = context;
+    pub fn preContextTick(_: *@This(), _: *ECSContext) void {
         if (zeika.isKeyJustPressed(.keyboard_escape, 0)) {
             game.quit();
         }
@@ -25,8 +24,7 @@ pub const MainSystem = struct {
 };
 
 pub const SpriteRenderingSystem = struct {
-    pub fn render(self: *@This(), context: *ECSContext) void {
-        _ = self;
+    pub fn render(_: *@This(), context: *ECSContext) void {
         var comp_iter = context.compIter(getArchetype());
         while (comp_iter.next()) |iter| {
             const transform_comp = iter.getValue(0);
@@ -39,8 +37,7 @@ pub const SpriteRenderingSystem = struct {
 };
 
 pub const TextRenderingSystem = struct {
-    pub fn render(self: *@This(), context: *ECSContext) void {
-        _ = self;
+    pub fn render(_: *@This(), context: *ECSContext) void {
         var comp_iter = context.compIter(getArchetype());
         while (comp_iter.next()) |iter| {
             const transform_comp = iter.getValue(0);
@@ -55,8 +52,7 @@ pub const TextRenderingSystem = struct {
 };
 
 pub const UISystem = struct {
-    pub fn preContextTick(self: *@This(), context: *ECSContext) void {
-        _ = self;
+    pub fn preContextTick(_: *@This(), context: *ECSContext) void {
         const world_mouse_pos: Vec2 = game.getWorldMousePos();
         const mouse_collider: Rect2 = .{ .x = world_mouse_pos.x, .y = world_mouse_pos.y, .w = 1.0, .h = 1.0 };
 
