@@ -62,7 +62,6 @@ pub const ECSContext = ecs.ECSContext(.{
 var is_game_running = false;
 
 pub fn init(props: GameProperties) !void {
-    _ = PersistentState.init(std.heap.page_allocator);
     game_properties = props;
     try zeika.initAll(
         game_properties.title,
@@ -71,6 +70,8 @@ pub fn init(props: GameProperties) !void {
         game_properties.resolution.x,
         game_properties.resolution.y
     );
+    var persistent_state = PersistentState.init(std.heap.page_allocator);
+    try persistent_state.load();
 }
 
 pub inline fn initAndRun(props: GameProperties) !void {
@@ -79,7 +80,9 @@ pub inline fn initAndRun(props: GameProperties) !void {
 }
 
 pub fn deinit() void {
-    PersistentState.get().deinit();
+    var persistent_state = PersistentState.get();
+    persistent_state.save() catch unreachable;
+    persistent_state.deinit();
     zeika.shutdownAll();
 }
 
@@ -98,6 +101,7 @@ pub fn run() !void {
                 assets.DefaultFont.len,
                 .{ .font_size = 16, .apply_nearest_neighbor = true }
             );
+
             return @This(){
                 .allocator = allocator,
                 .ecs_context = ecs_context,
@@ -132,7 +136,8 @@ pub fn run() !void {
                     .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
                 });
                 if (self.ecs_context.getComponent(energy_label_entity, TextLabelComponent)) |text_label_comp| {
-                    try text_label_comp.text_label.text.set("Energy: 0", .{});
+                    const persistent_state = PersistentState.get();
+                    try text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy });
                 }
             }
 

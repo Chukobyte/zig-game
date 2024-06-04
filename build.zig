@@ -25,6 +25,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/game/game.zig" },
     });
     game_module.addImport("zeika", zeika_module);
+    game_module.addImport("engine", engine_module);
 
     const assets_module = b.addModule("assets", .{
         .root_source_file = .{ .path = "embed_assets.zig" },
