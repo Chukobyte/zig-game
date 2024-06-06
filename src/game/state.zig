@@ -109,7 +109,7 @@ pub const PersistentState = struct {
 
     pub fn refreshTextLabel(self: *@This(), text_label_comp: *TextLabelComponent) !void {
         try text_label_comp.text_label.setText(
-            "Food: {any}        Materials: {any}        Money: {any}",
+            "Food: {any}                                Materials: {any}                                Money: {any}",
             .{ self.food.value, self.materials.value, self.money.value }
         );
     }
