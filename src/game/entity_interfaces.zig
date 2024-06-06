@@ -38,8 +38,8 @@ pub const StatBarInterface = struct {
     pub fn idleIncrement(_: *@This(), context: *ECSContext, entity: Entity) void {
         if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
             var persistent_state = PersistentState.get();
-            persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
-            text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
+            // persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
+            persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
         }
     }
 
@@ -65,8 +65,8 @@ pub const SpriteButtonInterface = struct {
                 if (context.getEntityByTag("text_label")) |text_label_entity| {
                     if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
                         var persistent_state = PersistentState.get();
-                        persistent_state.energy.addScalar(&persistent_state.energy, 1) catch unreachable;
-                        text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy }) catch unreachable;
+                        persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
+                        persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
                     }
                 }
             }

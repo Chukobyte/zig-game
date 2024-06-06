@@ -137,7 +137,7 @@ pub fn run() !void {
                 });
                 if (self.ecs_context.getComponent(energy_label_entity, TextLabelComponent)) |text_label_comp| {
                     const persistent_state = PersistentState.get();
-                    try text_label_comp.text_label.setText("Energy: {any}", .{ persistent_state.energy });
+                    try persistent_state.refreshTextLabel(text_label_comp);
                 }
             }
 
