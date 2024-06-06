@@ -89,30 +89,55 @@ pub fn deinit() void {
 pub fn run() !void {
     // Acts as a temp in place struct for where init, setup, and deinit will be done at a scene level
     const Scene = struct {
+
+        const AssetsContainer = struct {
+            stat_bar_font: Font,
+            add_tile_texture: Texture.Handle,
+            solid_colored_texture: Texture.Handle,
+
+            fn init() @This() {
+                // TODO: Look into why this is broken
+                // const texture_test: Texture.Handle = Texture.initFromMemory(
+                //     assets.AddTileTexture.data,
+                //     assets.AddTileTexture.len
+                // );
+                // std.debug.print("texture_test = {any}", .{ texture_test });
+                return @This(){
+                    .stat_bar_font = Font.initFromMemory(
+                        assets.DefaultFont.data,
+                        assets.DefaultFont.len,
+                        .{ .font_size = 16, .apply_nearest_neighbor = true }
+                    ),
+                    // .add_tile_texture = Texture.initFromMemory(
+                    //     assets.AddTileTexture.data,
+                    //     assets.AddTileTexture.len
+                    // ),
+                    .add_tile_texture = undefined,
+                    .solid_colored_texture = Texture.initSolidColoredTexture(1, 1, 255),
+                };
+            }
+
+            fn deinit(self: *@This()) void {
+                self.stat_bar_font.deinit();
+                // Texture.deinit(self.add_tile_texture);
+                Texture.deinit(self.solid_colored_texture);
+            }
+        };
+
         allocator: std.mem.Allocator,
         ecs_context: *ECSContext,
-        texture_handle: Texture.Handle,
-        font: Font,
+        assets: AssetsContainer,
 
         pub fn init(allocator: std.mem.Allocator, ecs_context: *ECSContext) !@This() {
-            const texture_handle: Texture.Handle = Texture.initSolidColoredTexture(1, 1, 255);
-            const default_font: Font = Font.initFromMemory(
-                assets.DefaultFont.data,
-                assets.DefaultFont.len,
-                .{ .font_size = 16, .apply_nearest_neighbor = true }
-            );
-
             return @This(){
                 .allocator = allocator,
                 .ecs_context = ecs_context,
-                .texture_handle = texture_handle,
-                .font = default_font,
+                .assets = AssetsContainer.init(),
             };
         }
 
         pub fn deinit(self: *@This()) void {
-            Texture.deinit(self.texture_handle);
-            self.font.deinit();
+            self.assets.deinit();
         }
 
         pub fn setupInitialScene(self: *@This()) !void {
@@ -123,17 +148,17 @@ pub fn run() !void {
                 try self.ecs_context.setComponent(stat_bar_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
                 try self.ecs_context.setComponent(stat_bar_entity, SpriteComponent, &.{
                     .sprite = .{
-                        .texture = self.texture_handle,
+                        .texture = self.assets.solid_colored_texture,
                         .size = .{ .x = @floatFromInt(game_properties.resolution.x), .y = 32 },
                         .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                        .modulate = Color.Blue
+                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
                     },
                 });
 
                 const energy_label_entity = try self.ecs_context.initEntity(.{ .interface = StatBarInterface, .tags = &.{ "text_label" } });
                 try self.ecs_context.setComponent(energy_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 10.0, .y = 20.0 } } });
                 try self.ecs_context.setComponent(energy_label_entity, TextLabelComponent, &.{ .text_label = .{
-                    .font = self.font, .text = TextLabel.String.init(self.allocator), .color = Color.Red }
+                    .font = self.assets.stat_bar_font, .text = TextLabel.String.init(self.allocator), .color = .{ .r = 243, .g = 97, .b = 255 } },
                 });
                 if (self.ecs_context.getComponent(energy_label_entity, TextLabelComponent)) |text_label_comp| {
                     const persistent_state = PersistentState.get();
@@ -147,10 +172,10 @@ pub fn run() !void {
                 try self.ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
                 try self.ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
                     .sprite = .{
-                        .texture = self.texture_handle,
+                        .texture = self.assets.solid_colored_texture,
                         .size = .{ .x = 64.0, .y = 64.0 },
                         .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                        .modulate = Color.Blue
+                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
                     },
                 });
                 try self.ecs_context.setComponent(sprite_button_entity, UIWidgetComponent, &.{

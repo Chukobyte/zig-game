@@ -1,6 +1,10 @@
 ///! Zig file used to embed assets at compile time
 
+// Fonts
 pub const DefaultFont = EmbeddedAsset.create("assets/font/verdana.ttf");
+
+// Images
+pub const AddTileTexture = EmbeddedAsset.create("assets/images/add_tile.png");
 
 const EmbeddedAsset = struct {
     data: *anyopaque,
