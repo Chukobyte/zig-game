@@ -92,15 +92,18 @@ pub fn run() !void {
 
         const AssetsContainer = struct {
             stat_bar_font: Font,
-            add_tile_texture: Texture.Handle,
-            solid_colored_texture: Texture.Handle,
+            add_tile_texture: Texture,
+            solid_colored_texture: Texture,
 
             fn init() @This() {
                 return @This(){
                     .stat_bar_font = Font.initFromMemory(
-                        assets.DefaultFont.data,
-                        assets.DefaultFont.len,
-                        .{ .font_size = 16, .apply_nearest_neighbor = true }
+                        &.{
+                            .buffer = assets.DefaultFont.data,
+                            .buffer_len = assets.DefaultFont.len,
+                            .font_size = 16,
+                            .apply_nearest_neighbor = true
+                        }
                     ),
                     .add_tile_texture = Texture.initFromMemory(
                         assets.AddTileTexture.data,

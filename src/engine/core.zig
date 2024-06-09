@@ -19,7 +19,7 @@ const Texture = zeika.Texture;
 const Font = zeika.Font;
 
 pub const Sprite = struct {
-    texture: Texture.Handle,
+    texture: Texture,
     draw_source: Rect2,
     size: Vec2,
     origin: Vec2 = Vec2.Zero,
