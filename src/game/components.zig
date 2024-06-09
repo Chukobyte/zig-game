@@ -52,13 +52,7 @@ pub const UIWidgetComponent = struct {
         button: ButtonWidget,
     };
 
-    pub const OnMouseHoveredEvent = Event(fn (*UIWidgetComponent) void);
-    pub const OnMouseUnhoveredEvent = Event(fn (*UIWidgetComponent) void);
-
     widget: Widget = undefined,
     bounds: ?Rect2 = null,
     is_hovered: bool = false,
-
-    on_mouse_hovered: OnMouseHoveredEvent = undefined,
-    on_mouse_unhovered: OnMouseUnhoveredEvent = undefined,
 };

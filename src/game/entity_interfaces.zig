@@ -75,5 +75,37 @@ pub const SpriteButtonInterface = struct {
         }
     }
 
-    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, ColliderComponent }; }
+    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
+};
+
+pub const AddTileButtonInterface = struct {
+    pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
+        _ = self;
+        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
+        const widget_comp = context.getComponent(entity, UIWidgetComponent).?;
+
+        var sprite = &sprite_comp.sprite;
+        if (widget_comp.is_hovered) {
+            const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
+            if (button.is_pressed) {
+                sprite.modulate = Color{ .r = 100, .g = 100, .b = 100 };
+            } else {
+                sprite.modulate = Color{ .r = 366, .g = 366, .b = 366 };
+            }
+
+            if (button.was_just_pressed) {
+                if (context.getEntityByTag("text_label")) |text_label_entity| {
+                    if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
+                        var persistent_state = PersistentState.get();
+                        persistent_state.money.value.addScalar(&persistent_state.money.value, 1) catch unreachable;
+                        persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
+                    }
+                }
+            }
+        } else {
+            sprite.modulate = Color.White;
+        }
+    }
+
+    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
 };

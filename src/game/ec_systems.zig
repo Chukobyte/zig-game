@@ -71,10 +71,8 @@ pub const UISystem = struct {
                 const is_mouse_hovering = full_bounds.doesOverlap(&mouse_collider);
                 if (!widget_comp.is_hovered and is_mouse_hovering) {
                     widget_comp.is_hovered = true;
-                    widget_comp.on_mouse_hovered.broadcast(.{ widget_comp });
                 } else if (widget_comp.is_hovered and !is_mouse_hovering) {
                     widget_comp.is_hovered = false;
-                    widget_comp.on_mouse_unhovered.broadcast(.{ widget_comp });
                 }
 
                 switch (widget_comp.widget) {

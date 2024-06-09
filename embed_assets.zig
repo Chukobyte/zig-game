@@ -7,13 +7,13 @@ pub const DefaultFont = EmbeddedAsset.create("assets/font/verdana.ttf");
 pub const AddTileTexture = EmbeddedAsset.create("assets/images/add_tile.png");
 
 const EmbeddedAsset = struct {
-    data: *const anyopaque,
+    ptr: *const anyopaque,
     len: usize,
 
     fn create(comptime file_path: []const u8) EmbeddedAsset {
         const embedded_file = @embedFile(file_path);
         return EmbeddedAsset{
-            .data = @ptrCast(embedded_file.ptr),
+            .ptr = @ptrCast(embedded_file.ptr),
             .len = embedded_file.len,
         };
     }

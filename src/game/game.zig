@@ -35,6 +35,7 @@ const UISystem = ec_systems.UISystem;
 const PersistentState = state.PersistentState;
 
 const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
+const AddTileButtonInterface = entity_interfaces.AddTileButtonInterface;
 const StatBarInterface = entity_interfaces.StatBarInterface;
 
 const TransformComponent = comps.TransformComponent;
@@ -54,7 +55,7 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ SpriteButtonInterface, StatBarInterface },
+    .entity_interfaces = &.{ SpriteButtonInterface, AddTileButtonInterface, StatBarInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
@@ -99,14 +100,14 @@ pub fn run() !void {
                 return @This(){
                     .stat_bar_font = Font.initFromMemory(
                         &.{
-                            .buffer = assets.DefaultFont.data,
+                            .buffer = assets.DefaultFont.ptr,
                             .buffer_len = assets.DefaultFont.len,
                             .font_size = 16,
                             .apply_nearest_neighbor = true
                         }
                     ),
                     .add_tile_texture = Texture.initFromMemory(
-                        assets.AddTileTexture.data,
+                        assets.AddTileTexture.ptr,
                         assets.AddTileTexture.len
                     ),
                     .solid_colored_texture = Texture.initSolidColoredTexture(1, 1, 255),
@@ -162,6 +163,23 @@ pub fn run() !void {
                 }
             }
 
+            // Temp button for searching tile
+            {
+                const search_tile_entity = try self.ecs_context.initEntity(.{ .interface = AddTileButtonInterface, .tags = &.{ "search_tile" } });
+                try self.ecs_context.setComponent(search_tile_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 350.0, .y = 200.0 } } });
+                try self.ecs_context.setComponent(search_tile_entity, SpriteComponent, &.{
+                    .sprite = .{
+                        .texture = self.assets.add_tile_texture,
+                        .size = .{ .x = 32, .y = 32 },
+                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
+                    },
+                });
+                try self.ecs_context.setComponent(search_tile_entity, UIWidgetComponent, &.{
+                    .widget = .{ .button = .{} },
+                    .bounds = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
+                });
+            }
+
             // Temp test sprite button widget
             {
                 const sprite_button_entity = try self.ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
@@ -178,9 +196,6 @@ pub fn run() !void {
                     .widget = .{ .button = .{} },
                     .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
                 });
-                var widget_comp: *UIWidgetComponent = self.ecs_context.getComponent(sprite_button_entity, UIWidgetComponent).?;
-                widget_comp.on_mouse_hovered = OnMouseHoveredEvent.init(self.allocator);
-                widget_comp.on_mouse_unhovered = OnMouseUnhoveredEvent.init(self.allocator);
             }
         }
     };
