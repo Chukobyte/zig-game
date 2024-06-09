@@ -46,7 +46,7 @@ const OnMouseHoveredEvent = UIWidgetComponent.OnMouseHoveredEvent;
 const OnMouseUnhoveredEvent = UIWidgetComponent.OnMouseUnhoveredEvent;
 
 pub const GameProperties = struct {
-    title: []const u8 = "ZigTest",
+    title: [:0]const u8 = "ZigTest",
     initial_window_size: Vec2i = .{ .x = 800, .y = 450 },
     resolution: Vec2i = .{ .x = 800, .y = 450 },
 };
@@ -96,31 +96,24 @@ pub fn run() !void {
             solid_colored_texture: Texture.Handle,
 
             fn init() @This() {
-                // TODO: Look into why this is broken
-                // const texture_test: Texture.Handle = Texture.initFromMemory(
-                //     assets.AddTileTexture.data,
-                //     assets.AddTileTexture.len
-                // );
-                // std.debug.print("texture_test = {any}", .{ texture_test });
                 return @This(){
                     .stat_bar_font = Font.initFromMemory(
                         assets.DefaultFont.data,
                         assets.DefaultFont.len,
                         .{ .font_size = 16, .apply_nearest_neighbor = true }
                     ),
-                    // .add_tile_texture = Texture.initFromMemory(
-                    //     assets.AddTileTexture.data,
-                    //     assets.AddTileTexture.len
-                    // ),
-                    .add_tile_texture = undefined,
+                    .add_tile_texture = Texture.initFromMemory(
+                        assets.AddTileTexture.data,
+                        assets.AddTileTexture.len
+                    ),
                     .solid_colored_texture = Texture.initSolidColoredTexture(1, 1, 255),
                 };
             }
 
             fn deinit(self: *@This()) void {
                 self.stat_bar_font.deinit();
-                // Texture.deinit(self.add_tile_texture);
-                Texture.deinit(self.solid_colored_texture);
+                self.add_tile_texture.deinit();
+                self.solid_colored_texture.deinit();
             }
         };
 

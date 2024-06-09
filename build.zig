@@ -11,24 +11,24 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "game",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     const engine_module = b.addModule("engine", .{
-        .root_source_file = .{ .path = "src/engine/engine.zig" },
+        .root_source_file = b.path("src/engine/engine.zig"),
     });
     engine_module.addImport("zeika", zeika_module);
 
     const game_module = b.addModule("game", .{
-        .root_source_file = .{ .path = "src/game/game.zig" },
+        .root_source_file = b.path("src/game/game.zig"),
     });
     game_module.addImport("zeika", zeika_module);
     game_module.addImport("engine", engine_module);
 
     const assets_module = b.addModule("assets", .{
-        .root_source_file = .{ .path = "embed_assets.zig" },
+        .root_source_file = b.path("embed_assets.zig"),
     });
 
     exe.linkLibC();
@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
 
     for (test_defs) |def| {
         const test_exe = b.addTest(.{
-            .root_source_file = .{ .path = def.file_path },
+            .root_source_file = b.path(def.file_path),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
