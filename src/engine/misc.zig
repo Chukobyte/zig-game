@@ -6,7 +6,7 @@ const std = @import("std");
 pub const ArrayListUtils = struct {
     pub fn findIndexByValue(comptime T: type, list: *std.ArrayList(T), value: *const T) ?usize {
         for (list.items, 0..list.items.len) |*item, i| {
-            if (item == value) {
+            if (std.mem.eql(u8, std.mem.asBytes(item), std.mem.asBytes(value))) {
                 return i;
             }
         }

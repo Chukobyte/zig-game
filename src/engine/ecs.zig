@@ -377,21 +377,42 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             self.entities_queued_for_deletion.deinit();
         }
 
+        pub fn newFrame(self: *@This()) void {
+            self.clearQueuedForDeletionEntities();
+        }
+
         fn clearQueuedForDeletionEntities(self: *@This()) void {
             if (self.entities_queued_for_deletion.items.len == 0) { return; }
 
             for (self.entities_queued_for_deletion.items) |entity| {
                 var entity_data: *EntityData = &self.entity_data_list.items[entity];
-                inline for (0..entity_interface_types.len) |i| {
+                inter: inline for (0..entity_interface_types.len) |i| {
                     const T: type = entity_interface_type_list.getType(i);
                     if (T == entity_interface_types[i]) {
                         if (entity_data.interface) |interface| {
                             const interface_ptr: *T = @alignCast(@ptrCast(interface.instance));
+                            if (@hasDecl(T, "idleIncrement")) {
+                                ArrayListUtils.removeByValue(Entity, &self.entity_interface_idle_increment_data_list, &entity);
+                            }
+                            if (@hasDecl(T, "tick")) {
+                                ArrayListUtils.removeByValue(Entity, &self.entity_interface_tick_data_list, &entity);
+                            }
+                            if (@hasDecl(T, "deinit")) {
+                                if (interface.interface_id == i) {
+                                    interface_ptr.deinit(self, entity);
+                                }
+                            }
                             self.allocator.destroy(interface_ptr);
                             entity_data.interface = null;
                         }
+                        break :inter;
                     }
                 }
+
+                entity_data.component_signature.unsetAll();
+                self.refreshArchetypeState(entity) catch {}; // Not worried about error
+                entity_data.tag_list = .{};
+
                 inline for (0..component_types.len) |i| {
                     if (entity_data.components[i]) |component| {
                         const T: type = component_type_list.getType(i);
@@ -400,6 +421,7 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                         entity_data.components[i] = null;
                     }
                 }
+
             }
             self.entities_queued_for_deletion.clearAndFree();
         }
@@ -439,8 +461,6 @@ pub fn ECSContext(context_params: ECSContextParams) type {
         }
 
         fn tick(self: *@This()) void {
-            self.clearQueuedForDeletionEntities();
-
             // Pre entity tick
             inline for (0..system_type_list.len) |i| {
                 const T: type = system_type_list.getType(i);
@@ -561,32 +581,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             return new_entity;
         }
 
+        /// Queues entity to deinit on next frame (tick)
         pub fn deinitEntity(self: *@This(), entity: Entity) void {
             if (self.isEntityValid(entity)) {
-                const entity_data: *EntityData = &self.entity_data_list.items[entity];
-                entity_data.component_signature.unsetAll();
-                self.refreshArchetypeState(entity) catch {}; // Not worried about error
-                if (entity_data.interface) |interface| {
-                    inline for (0..entity_interface_types.len) |i| {
-                        const T: type = entity_interface_type_list.getType(i);
-                        if (@hasDecl(T, "idleIncrement")) {
-                            ArrayListUtils.removeByValue(Entity, &self.entity_interface_idle_increment_data_list, &entity);
-                        }
-                        if (@hasDecl(T, "tick")) {
-                            ArrayListUtils.removeByValue(Entity, &self.entity_interface_tick_data_list, &entity);
-                        }
-                        if (@hasDecl(T, "deinit")) {
-                            if (entity_data.interface.?.interface_id == i) {
-                                const interface_ptr: *T = @alignCast(@ptrCast(interface.instance));
-                                interface_ptr.deinit(self, entity);
-                            }
-                        }
-                    }
-                }
-
-                entity_data.tag_list = .{};
-                entity_data.is_valid = false;
-                self.entities_queued_for_deletion.append(entity) catch { unreachable; }; // TODO: Clean up
+                self.entity_data_list.items[entity].is_valid = false;
+                self.entities_queued_for_deletion.append(entity) catch { unreachable; }; // TODO: Return error
             }
         }
 

@@ -225,6 +225,8 @@ test "ecs test" {
     try std.testing.expectEqual(true, TestEntityInterface.has_called_idle_increment);
     ecs_context.deinitEntity(new_entity);
     try std.testing.expectEqual(false, ecs_context.isEntityValid(new_entity));
+    try std.testing.expectEqual(false, TestEntityInterface.has_called_deinit);
+    ecs_context.newFrame();
     try std.testing.expectEqual(true, TestEntityInterface.has_called_deinit);
 
     ecs_context.event(.render);
@@ -425,4 +427,27 @@ test "persistent state test" {
     result_string = try result.toString(allocator, 10, .upper);
     try std.testing.expectEqualStrings("12000", result_string);
     allocator.free(result_string);
+}
+
+test "array list utils test" {
+    const ArrayListUtils = misc.ArrayListUtils;
+
+    const allocator = std.testing.allocator;
+    var num_list = std.ArrayList(i32).init(allocator);
+    defer num_list.deinit();
+
+    for ([_]i32{ 1, 2, 3 }) |i| {
+        try num_list.append(i);
+    }
+    const not_found_index = ArrayListUtils.findIndexByValue(i32, &num_list, &-1);
+    try std.testing.expectEqual(true, not_found_index == null);
+    const three_index = ArrayListUtils.findIndexByValue(i32, &num_list, &3);
+    try std.testing.expectEqual(true, three_index != null);
+
+    const one_index = ArrayListUtils.findIndexByPred(i32, &num_list, &1, struct {
+        pub fn isEqual(a: *const i32, b: *const i32) bool {
+            return a.* == b.*;
+        }
+    }.isEqual);
+    try std.testing.expectEqual(true, one_index != null);
 }

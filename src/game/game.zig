@@ -217,6 +217,9 @@ pub fn run() !void {
         const seconds_to_increment: comptime_int = 1;
         const nanoseconds_to_increment: comptime_int = seconds_to_increment * 1_000_000_000;
         const current_time = timer.read();
+
+        ecs_context.newFrame();
+
         if (current_time >= nanoseconds_to_increment) {
             timer.reset();
             ecs_context.event(.idle_increment);

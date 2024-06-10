@@ -94,13 +94,14 @@ pub const AddTileButtonInterface = struct {
             }
 
             if (button.was_just_pressed) {
-                if (context.getEntityByTag("text_label")) |text_label_entity| {
-                    if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                        var persistent_state = PersistentState.get();
-                        persistent_state.money.value.addScalar(&persistent_state.money.value, 1) catch unreachable;
-                        persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-                    }
-                }
+                context.deinitEntity(entity);
+                // if (context.getEntityByTag("text_label")) |text_label_entity| {
+                //     if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
+                //         var persistent_state = PersistentState.get();
+                //         persistent_state.money.value.addScalar(&persistent_state.money.value, 1) catch unreachable;
+                //         persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
+                //     }
+                // }
             }
         } else {
             sprite.modulate = Color.White;
