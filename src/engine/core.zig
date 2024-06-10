@@ -27,12 +27,16 @@ pub const Sprite = struct {
     flip_v: bool = false,
     modulate: Color = Color.White,
 
-    pub fn getDrawConfig(self: *const @This(), transform: *const Transform2D, z_index: i32) Renderer.SpriteDrawQueueConfig {
+    pub inline fn getDrawConfig(self: *const @This(), transform: *const Transform2D, z_index: i32) Renderer.SpriteDrawQueueConfig {
         return .{
             .texture_handle = self.texture,
             .draw_source = self.draw_source,
             .size = self.size,
-            .transform = transform,
+            .transform = &.{
+                .position = .{ .x = transform.position.x + self.origin.x, .y = transform.position.y + self.origin.y },
+                .scale = transform.scale,
+                .rotation = transform.rotation,
+            },
             .color = self.modulate,
             .flip_h = self.flip_h,
             .flip_v = self.flip_v,
@@ -47,16 +51,17 @@ pub const TextLabel = struct {
     font: Font,
     text: String,
     color: Color = Color.White,
+    origin: Vec2 = Vec2.Zero,
 
     pub inline fn setText(self: *@This(), comptime fmt: []const u8, args: anytype) !void {
         try self.text.set(fmt, args);
     }
 
-    pub fn getDrawConfig(self: *const @This(), position: Vec2, z_index: i32) Renderer.TextDrawQueueConfig {
+    pub inline fn getDrawConfig(self: *const @This(), position: Vec2, z_index: i32) Renderer.TextDrawQueueConfig {
         return .{
             .font = self.font,
             .text = self.text.get(),
-            .position = position,
+            .position = Vec2{ .x = position.x + self.origin.x, .y = position.y + self.origin.y },
             .color = self.color,
             .z_index = z_index,
         };

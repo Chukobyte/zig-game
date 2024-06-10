@@ -96,17 +96,26 @@ pub const AddTileButtonInterface = struct {
 
             if (button.was_just_pressed) {
                 defer context.deinitEntity(entity);
-                const new_tile_entity: Entity = context.initEntity(.{ .tags = &.{ "tile" } }) catch unreachable;
+                const new_tile_entity: Entity = context.initEntity(.{ .interface = TileInterface, .tags = &.{ "tile" } }) catch unreachable;
                 const transform_comp = context.getComponent(entity, TransformComponent).?;
-                context.setComponent(new_tile_entity, TransformComponent, &.{ .transform = transform_comp.transform }) catch unreachable;
+                const new_tile_transform = transform_comp.transform;
+                context.setComponent(new_tile_entity, TransformComponent, &.{ .transform = new_tile_transform }) catch unreachable;
                 context.setComponent(new_tile_entity, SpriteComponent, &.{
                     .sprite = .{
                         .texture = AssetDB.get().solid_colored_texture,
-                        .size = .{ .x = 64.0, .y = 64.0 },
+                        .size = .{ .x = 80.0, .y = 80.0 },
                         .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
                         .modulate = .{ .r = 32, .g = 0, .b = 178 },
                     },
                 })  catch unreachable;
+                context.setComponent(new_tile_entity, TextLabelComponent, &.{
+                    .text_label = .{
+                        .font = AssetDB.get().tile_font,
+                        .text = TextLabel.String.init(context.allocator),
+                        .color = Color.White,
+                        .origin = Vec2{ .x = 5.0, .y = 75.0 },
+                    }
+                }) catch unreachable;
             }
         } else {
             sprite.modulate = Color.White;
@@ -114,4 +123,44 @@ pub const AddTileButtonInterface = struct {
     }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
+};
+
+pub const TileInterface = struct {
+    const State = enum {
+        initial,
+        in_battle,
+        owned,
+    };
+
+    battles_won: usize = 0,
+    battles_to_fight: usize = 10,
+    state: State = .initial,
+
+    pub fn idleIncrement(self: *@This(), context: *ECSContext, entity: Entity) void {
+        switch (self.state) {
+            .initial => {
+                self.state = .in_battle;
+                self.updateBattleText(context, entity);
+            },
+            .in_battle => self.processBattle(context, entity),
+            .owned => {},
+        }
+    }
+
+    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent }; }
+
+    fn processBattle(self: *@This(), context: *ECSContext, entity: Entity) void {
+        if (self.battles_won < self.battles_to_fight) {
+            self.battles_won += 1;
+            self.updateBattleText(context, entity);
+            if (self.battles_won >= self.battles_to_fight) {
+                self.state = .owned;
+            }
+        }
+    }
+
+    inline fn updateBattleText(self: *@This(), context: *ECSContext, entity: Entity) void {
+        const text_label_comp = context.getComponent(entity, TextLabelComponent).?;
+        text_label_comp.text_label.setText("Battles: {d}/{d}", .{ self.battles_won, self.battles_to_fight }) catch unreachable;
+    }
 };

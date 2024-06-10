@@ -38,6 +38,7 @@ const PersistentState = state.PersistentState;
 const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
 const AddTileButtonInterface = entity_interfaces.AddTileButtonInterface;
 const StatBarInterface = entity_interfaces.StatBarInterface;
+const TileInterface = entity_interfaces.TileInterface;
 
 const AssetDB = asset_db.AssetDB;
 
@@ -58,7 +59,7 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ SpriteButtonInterface, AddTileButtonInterface, StatBarInterface },
+    .entity_interfaces = &.{ SpriteButtonInterface, AddTileButtonInterface, StatBarInterface, TileInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
