@@ -3,9 +3,9 @@ const std = @import("std");
 const zeika = @import("zeika");
 const math = zeika.math;
 
-const game = @import("game.zig");
 const comps = @import("components.zig");
 const state = @import("state.zig");
+const asset_db = @import("asset_db.zig");
 
 const engine = @import("engine");
 const core = engine.core;
@@ -23,7 +23,9 @@ const TextLabel = core.TextLabel;
 
 const PersistentState = state.PersistentState;
 
-const ECSContext = game.ECSContext;
+const AssetDB = asset_db.AssetDB;
+
+const ECSContext = @import("game.zig").ECSContext;
 const Entity = ECSContext.Entity;
 
 const TransformComponent = comps.TransformComponent;
@@ -79,8 +81,7 @@ pub const SpriteButtonInterface = struct {
 };
 
 pub const AddTileButtonInterface = struct {
-    pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
-        _ = self;
+    pub fn tick(_: *@This(), context: *ECSContext, entity: Entity) void {
         const sprite_comp = context.getComponent(entity, SpriteComponent).?;
         const widget_comp = context.getComponent(entity, UIWidgetComponent).?;
 
@@ -94,14 +95,18 @@ pub const AddTileButtonInterface = struct {
             }
 
             if (button.was_just_pressed) {
-                context.deinitEntity(entity);
-                // if (context.getEntityByTag("text_label")) |text_label_entity| {
-                //     if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                //         var persistent_state = PersistentState.get();
-                //         persistent_state.money.value.addScalar(&persistent_state.money.value, 1) catch unreachable;
-                //         persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-                //     }
-                // }
+                defer context.deinitEntity(entity);
+                const new_tile_entity: Entity = context.initEntity(.{ .tags = &.{ "tile" } }) catch unreachable;
+                const transform_comp = context.getComponent(entity, TransformComponent).?;
+                context.setComponent(new_tile_entity, TransformComponent, &.{ .transform = transform_comp.transform }) catch unreachable;
+                context.setComponent(new_tile_entity, SpriteComponent, &.{
+                    .sprite = .{
+                        .texture = AssetDB.get().solid_colored_texture,
+                        .size = .{ .x = 64.0, .y = 64.0 },
+                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
+                    },
+                })  catch unreachable;
             }
         } else {
             sprite.modulate = Color.White;

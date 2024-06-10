@@ -512,22 +512,22 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             id: Entity,
             context: *ECSContextType,
 
-            pub inline fn deinit(self: *@This()) void {
+            pub inline fn deinit(self: *const @This()) void {
                 self.context.deinitEntity(self.id);
             }
             pub inline fn isValid(self: *const @This()) bool {
                 return self.context.isEntityValid(self.id);
             }
-            pub inline fn setComponent(self: *@This(), comptime T: type, component: *const T) !void {
+            pub inline fn setComponent(self: *const @This(), comptime T: type, component: *const T) !void {
                 return self.context.setComponent(self.id, T, component);
             }
-            pub inline fn getComponent(self: *@This(), comptime T: type) ?*T {
+            pub inline fn getComponent(self: *const @This(), comptime T: type) ?*T {
                 return self.context.getComponent(self.id, T);
             }
-            pub inline fn removeComponent(self: *@This(), comptime T: type) !void {
+            pub inline fn removeComponent(self: *const @This(), comptime T: type) !void {
                 return self.context.removeComponent(self.id, T);
             }
-            pub inline fn hasComponent(self: *@This(), comptime T: type) bool {
+            pub inline fn hasComponent(self: *const @This(), comptime T: type) bool {
                 return self.context.hasComponent(self.id, T);
             }
         };
@@ -579,6 +579,10 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             entity_data.is_valid = true;
 
             return new_entity;
+        }
+
+        pub inline fn initEntityAndRef(self: *@This(), comptime params: InitEntityParams) !WeakEntityRef {
+            return WeakEntityRef{ .id = try self.initEntity(params), .context = self };
         }
 
         /// Queues entity to deinit on next frame (tick)

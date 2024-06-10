@@ -10,6 +10,7 @@ pub const state = @import("state.zig");
 pub const comps = @import("components.zig");
 pub const ec_systems = @import("ec_systems.zig");
 pub const entity_interfaces = @import("entity_interfaces.zig");
+pub const asset_db = @import("asset_db.zig");
 
 const core = engine.core;
 const ecs = engine.ecs;
@@ -38,6 +39,8 @@ const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
 const AddTileButtonInterface = entity_interfaces.AddTileButtonInterface;
 const StatBarInterface = entity_interfaces.StatBarInterface;
 
+const AssetDB = asset_db.AssetDB;
+
 const TransformComponent = comps.TransformComponent;
 const SpriteComponent = comps.SpriteComponent;
 const TextLabelComponent = comps.TextLabelComponent;
@@ -59,6 +62,7 @@ pub const ECSContext = ecs.ECSContext(.{
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
+pub const WeakEntityRef = ECSContext.WeakEntityRef;
 
 var is_game_running = false;
 
@@ -87,129 +91,80 @@ pub fn deinit() void {
     zeika.shutdownAll();
 }
 
+fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
+    // TODO: Start using ui components for positioning
+    // Stat bar
+    {
+        const stat_bar_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "stat_bar" } });
+        try stat_bar_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
+        try stat_bar_entity.setComponent(SpriteComponent, &.{
+            .sprite = .{
+                .texture = game_asset_db.solid_colored_texture,
+                .size = .{ .x = @floatFromInt(game_properties.resolution.x), .y = 32 },
+                .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                .modulate = .{ .r = 32, .g = 0, .b = 178 },
+            },
+        });
+
+        const energy_label_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = StatBarInterface, .tags = &.{ "text_label" } });
+        try energy_label_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 10.0, .y = 20.0 } } });
+        try energy_label_entity.setComponent(TextLabelComponent, &.{ .text_label = .{
+            .font = game_asset_db.default_font, .text = TextLabel.String.init(ecs_context.allocator), .color = .{ .r = 243, .g = 97, .b = 255 } },
+        });
+        if (energy_label_entity.getComponent(TextLabelComponent)) |text_label_comp| {
+            const persistent_state = PersistentState.get();
+            try persistent_state.refreshTextLabel(text_label_comp);
+        }
+    }
+
+    // Temp button for searching tile
+    {
+        const search_tile_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = AddTileButtonInterface, .tags = &.{ "search_tile" } });
+        try search_tile_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 350.0, .y = 200.0 } } });
+        try search_tile_entity.setComponent(SpriteComponent, &.{
+            .sprite = .{
+                .texture = game_asset_db.add_tile_texture,
+                .size = .{ .x = 32, .y = 32 },
+                .draw_source = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
+            },
+        });
+        try search_tile_entity.setComponent(UIWidgetComponent, &.{
+            .widget = .{ .button = .{} },
+            .bounds = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
+        });
+    }
+
+    // Temp test sprite button widget
+    {
+        const sprite_button_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
+        try sprite_button_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
+        try sprite_button_entity.setComponent(SpriteComponent, &.{
+            .sprite = .{
+                .texture = game_asset_db.solid_colored_texture,
+                .size = .{ .x = 64.0, .y = 64.0 },
+                .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                .modulate = .{ .r = 32, .g = 0, .b = 178 },
+            },
+        });
+        try sprite_button_entity.setComponent(UIWidgetComponent, &.{
+            .widget = .{ .button = .{} },
+            .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
+        });
+    }
+}
+
 pub fn run() !void {
-    // Acts as a temp in place struct for where init, setup, and deinit will be done at a scene level
-    const Scene = struct {
-
-        const AssetsContainer = struct {
-            stat_bar_font: Font,
-            add_tile_texture: Texture,
-            solid_colored_texture: Texture,
-
-            fn init() @This() {
-                return @This(){
-                    .stat_bar_font = Font.initFromMemory(
-                        &.{
-                            .buffer = assets.DefaultFont.ptr,
-                            .buffer_len = assets.DefaultFont.len,
-                            .font_size = 16,
-                            .apply_nearest_neighbor = true
-                        }
-                    ),
-                    .add_tile_texture = Texture.initFromMemory(
-                        assets.AddTileTexture.ptr,
-                        assets.AddTileTexture.len
-                    ),
-                    .solid_colored_texture = Texture.initSolidColoredTexture(1, 1, 255),
-                };
-            }
-
-            fn deinit(self: *@This()) void {
-                self.stat_bar_font.deinit();
-                self.add_tile_texture.deinit();
-                self.solid_colored_texture.deinit();
-            }
-        };
-
-        allocator: std.mem.Allocator,
-        ecs_context: *ECSContext,
-        assets: AssetsContainer,
-
-        pub fn init(allocator: std.mem.Allocator, ecs_context: *ECSContext) !@This() {
-            return @This(){
-                .allocator = allocator,
-                .ecs_context = ecs_context,
-                .assets = AssetsContainer.init(),
-            };
-        }
-
-        pub fn deinit(self: *@This()) void {
-            self.assets.deinit();
-        }
-
-        pub fn setupInitialScene(self: *@This()) !void {
-            // TODO: Start using ui components for positioning
-            // Stat bar
-            {
-                const stat_bar_entity = try self.ecs_context.initEntity(.{ .tags = &.{ "stat_bar" } });
-                try self.ecs_context.setComponent(stat_bar_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
-                try self.ecs_context.setComponent(stat_bar_entity, SpriteComponent, &.{
-                    .sprite = .{
-                        .texture = self.assets.solid_colored_texture,
-                        .size = .{ .x = @floatFromInt(game_properties.resolution.x), .y = 32 },
-                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
-                    },
-                });
-
-                const energy_label_entity = try self.ecs_context.initEntity(.{ .interface = StatBarInterface, .tags = &.{ "text_label" } });
-                try self.ecs_context.setComponent(energy_label_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 10.0, .y = 20.0 } } });
-                try self.ecs_context.setComponent(energy_label_entity, TextLabelComponent, &.{ .text_label = .{
-                    .font = self.assets.stat_bar_font, .text = TextLabel.String.init(self.allocator), .color = .{ .r = 243, .g = 97, .b = 255 } },
-                });
-                if (self.ecs_context.getComponent(energy_label_entity, TextLabelComponent)) |text_label_comp| {
-                    const persistent_state = PersistentState.get();
-                    try persistent_state.refreshTextLabel(text_label_comp);
-                }
-            }
-
-            // Temp button for searching tile
-            {
-                const search_tile_entity = try self.ecs_context.initEntity(.{ .interface = AddTileButtonInterface, .tags = &.{ "search_tile" } });
-                try self.ecs_context.setComponent(search_tile_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 350.0, .y = 200.0 } } });
-                try self.ecs_context.setComponent(search_tile_entity, SpriteComponent, &.{
-                    .sprite = .{
-                        .texture = self.assets.add_tile_texture,
-                        .size = .{ .x = 32, .y = 32 },
-                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
-                    },
-                });
-                try self.ecs_context.setComponent(search_tile_entity, UIWidgetComponent, &.{
-                    .widget = .{ .button = .{} },
-                    .bounds = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
-                });
-            }
-
-            // Temp test sprite button widget
-            {
-                const sprite_button_entity = try self.ecs_context.initEntity(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
-                try self.ecs_context.setComponent(sprite_button_entity, TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
-                try self.ecs_context.setComponent(sprite_button_entity, SpriteComponent, &.{
-                    .sprite = .{
-                        .texture = self.assets.solid_colored_texture,
-                        .size = .{ .x = 64.0, .y = 64.0 },
-                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
-                    },
-                });
-                try self.ecs_context.setComponent(sprite_button_entity, UIWidgetComponent, &.{
-                    .widget = .{ .button = .{} },
-                    .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
-                });
-            }
-        }
-    };
-
     const allocator = std.heap.page_allocator;
 
     var ecs_context = try ECSContext.init(allocator);
     defer ecs_context.deinit();
 
+    var game_asset_db = AssetDB.init();
+    defer game_asset_db.deinit();
+
     is_game_running = true;
 
-    var scene = try Scene.init(allocator, &ecs_context);
-    defer scene.deinit();
-    try scene.setupInitialScene();
+    try setupInitialScene(&ecs_context, game_asset_db);
 
     var timer = try std.time.Timer.start();
 
