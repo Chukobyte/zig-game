@@ -142,22 +142,20 @@ pub const TileInterface = struct {
                 self.state = .in_battle;
                 self.updateBattleText(context, entity);
             },
-            .in_battle => self.processBattle(context, entity),
+            .in_battle => {
+                if (self.battles_won < self.battles_to_fight) {
+                    self.battles_won += 1;
+                    self.updateBattleText(context, entity);
+                    if (self.battles_won >= self.battles_to_fight) {
+                        self.state = .owned;
+                    }
+                }
+            },
             .owned => {},
         }
     }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent }; }
-
-    fn processBattle(self: *@This(), context: *ECSContext, entity: Entity) void {
-        if (self.battles_won < self.battles_to_fight) {
-            self.battles_won += 1;
-            self.updateBattleText(context, entity);
-            if (self.battles_won >= self.battles_to_fight) {
-                self.state = .owned;
-            }
-        }
-    }
 
     inline fn updateBattleText(self: *@This(), context: *ECSContext, entity: Entity) void {
         const text_label_comp = context.getComponent(entity, TextLabelComponent).?;
