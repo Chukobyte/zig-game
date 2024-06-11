@@ -96,7 +96,7 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
     // TODO: Start using ui components for positioning
     // Stat bar
     {
-        const stat_bar_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "stat_bar" } });
+        const stat_bar_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = StatBarInterface, .tags = &.{ "stat_bar" } });
         try stat_bar_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
         try stat_bar_entity.setComponent(SpriteComponent, &.{
             .sprite = .{
@@ -106,13 +106,10 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
                 .modulate = .{ .r = 32, .g = 0, .b = 178 },
             },
         });
-
-        const energy_label_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = StatBarInterface, .tags = &.{ "text_label" } });
-        try energy_label_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 10.0, .y = 20.0 } } });
-        try energy_label_entity.setComponent(TextLabelComponent, &.{ .text_label = .{
-            .font = game_asset_db.default_font, .text = TextLabel.String.init(ecs_context.allocator), .color = .{ .r = 243, .g = 97, .b = 255 } },
+        try stat_bar_entity.setComponent(TextLabelComponent, &.{ .text_label = .{
+            .font = game_asset_db.default_font, .text = TextLabel.String.init(ecs_context.allocator), .color = .{ .r = 243, .g = 97, .b = 255 }, .origin = .{ .x = 10.0, .y = 20.0 } },
         });
-        if (energy_label_entity.getComponent(TextLabelComponent)) |text_label_comp| {
+        if (stat_bar_entity.getComponent(TextLabelComponent)) |text_label_comp| {
             const persistent_state = PersistentState.get();
             try persistent_state.refreshTextLabel(text_label_comp);
         }

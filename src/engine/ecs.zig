@@ -417,6 +417,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                     if (entity_data.components[i]) |component| {
                         const T: type = component_type_list.getType(i);
                         const current_comp: *T = @alignCast(@ptrCast(component));
+
+                        if (@hasDecl(T, "deinit")) {
+                            current_comp.deinit();
+                        }
+
                         self.allocator.destroy(current_comp);
                         entity_data.components[i] = null;
                     }
@@ -611,13 +616,21 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index = component_type_list.getIndex(T);
             if (!hasComponent(self, entity,T)) {
-                entity_data.components[comp_index] = try self.allocator.create(T);
+                const new_comp: *T = try self.allocator.create(T);
+                @memcpy(std.mem.asBytes(new_comp), std.mem.asBytes(component));
+
+                if (@hasDecl(T, "init")) {
+                    new_comp.init();
+                }
+
+                entity_data.components[comp_index] = new_comp;
                 entity_data.component_signature.set(T);
                 try self.refreshArchetypeState(entity);
+            } else {
+                const current_comp: *T = @alignCast(@ptrCast(entity_data.components[comp_index].?));
+                @memcpy(std.mem.asBytes(current_comp), std.mem.asBytes(component));
             }
 
-            const current_comp: *T = @alignCast(@ptrCast(entity_data.components[comp_index].?));
-            @memcpy(std.mem.asBytes(current_comp), std.mem.asBytes(component));
         }
 
         pub fn getComponent(self: *@This(), entity: Entity, comptime T: type) ?*T {
@@ -635,6 +648,11 @@ pub fn ECSContext(context_params: ECSContextParams) type {
                 const comp_index: usize = component_type_list.getIndex(T);
 
                 const comp_ptr: *T = @alignCast(@ptrCast(entity_data.components[comp_index]));
+
+                if (@hasDecl(T, "deinit")) {
+                    comp_ptr.deinit();
+                }
+
                 self.allocator.destroy(comp_ptr);
                 entity_data.components[comp_index] = null;
                 entity_data.component_signature.unset(T);

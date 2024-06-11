@@ -31,6 +31,10 @@ pub const SpriteComponent = struct {
 
 pub const TextLabelComponent = struct {
     text_label: TextLabel,
+
+    pub fn deinit(self: *@This()) void {
+        self.text_label.text.deinit();
+    }
 };
 
 pub const ColliderComponent = struct {
