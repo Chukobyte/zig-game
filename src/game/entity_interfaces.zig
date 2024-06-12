@@ -35,16 +35,24 @@ const ColliderComponent = comps.ColliderComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const UIWidgetComponent = comps.UIWidgetComponent;
 
-pub const StatBarInterface = struct {
-    const energy_per_increment = 1;
-
-    pub fn idleIncrement(_: *@This(), context: *ECSContext, entity: Entity) void {
-        if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
-            var persistent_state = PersistentState.get();
-            // persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
-            persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
+fn refreshStatBarLabel(context: *ECSContext) void {
+    if (context.getEntityByTag("stat_bar")) |text_label_entity| {
+        if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
+            PersistentState.get().refreshTextLabel(text_label_comp) catch unreachable;
         }
     }
+}
+
+pub const StatBarInterface = struct {
+    // const energy_per_increment = 1;
+
+    // pub fn idleIncrement(_: *@This(), context: *ECSContext, entity: Entity) void {
+    //     if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
+    //         var persistent_state = PersistentState.get();
+    //         persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
+    //         persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
+    //     }
+    // }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
 };
@@ -65,13 +73,9 @@ pub const SpriteButtonInterface = struct {
             }
 
             if (button.was_just_pressed) {
-                if (context.getEntityByTag("stat_bar")) |text_label_entity| {
-                    if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-                        var persistent_state = PersistentState.get();
-                        persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
-                        persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-                    }
-                }
+                var persistent_state = PersistentState.get();
+                persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
+                refreshStatBarLabel(context);
             }
         } else {
             sprite.modulate = Color.Blue;
@@ -126,19 +130,22 @@ pub const AddTileButtonInterface = struct {
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
 };
 
+// TODO: Move this into a component and ec system
 pub const TileInterface = struct {
     const State = enum {
         initial,
         in_battle,
         owned,
+        farm,
     };
 
     battles_won: usize = 0,
     battles_to_fight: usize = 10,
     state: State = .initial,
     build_farm_button_entity: ?WeakEntityRef = null,
+    hire_farmer_button_entity: ?WeakEntityRef = null,
 
-    pub fn tick(self: *@This(), _: *ECSContext, _: Entity) void {
+    pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
         switch (self.state) {
             .owned => {
                 if (self.build_farm_button_entity) |farm_button_entity| {
@@ -153,11 +160,61 @@ pub const TileInterface = struct {
                         }
 
                         if (button.was_just_pressed) {
-                            // var persistent_state = PersistentState.get();
-                            // persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
-                            // persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-                            // farm_button_entity.deinit();
-                            // farm_button_entity = null;
+                            self.state = .farm;
+                            farm_button_entity.deinit();
+                            self.build_farm_button_entity = null;
+
+                            const transform_comp = context.getComponent(entity, TransformComponent).?;
+                            const hire_farmer_button_transform = Transform2D{
+                                .position = .{ .x = transform_comp.transform.position.x + 7.0,  .y = transform_comp.transform.position.y + 16.0 },
+                            };
+                            const hire_farmer_button_entity = context.initEntityAndRef(.{ .tags = &.{ "hire_farmer" } }) catch unreachable;
+                            hire_farmer_button_entity.setComponent(TransformComponent, &.{ .transform = hire_farmer_button_transform }) catch unreachable;
+                            hire_farmer_button_entity.setComponent(UIWidgetComponent, &.{
+                                .widget = .{ .button = .{} },
+                                .bounds = .{ .x = 0.0, .y = 0.0, .w = 68.0, .h = 20.0 },
+                            }) catch unreachable;
+                            hire_farmer_button_entity.setComponent(SpriteComponent, &.{
+                                .sprite = .{
+                                    .texture = AssetDB.get().solid_colored_texture,
+                                    .size = .{ .x = 68.0, .y = 20.0 },
+                                    .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                                    .modulate = .{ .r = 150, .g = 150, .b = 150 },
+                                },
+                            })  catch unreachable;
+                            hire_farmer_button_entity.setComponent(TextLabelComponent, &.{
+                                .text_label = .{
+                                    .font = AssetDB.get().tile_font,
+                                    .text = TextLabel.String.init(context.allocator),
+                                    .color = Color.White,
+                                    .origin = Vec2{ .x = 5.0, .y = 12.0 },
+                                }
+                            }) catch unreachable;
+                            const hire_farmer_text_label_comp = hire_farmer_button_entity.getComponent(TextLabelComponent).?;
+                            hire_farmer_text_label_comp.text_label.setText("Hire Farmer", .{}) catch unreachable;
+                            self.hire_farmer_button_entity = hire_farmer_button_entity;
+                        }
+                    } else {
+                        sprite_comp.sprite.modulate = .{ .r = 150, .g = 150, .b = 150 };
+                    }
+                }
+            },
+            .farm => {
+                if (self.hire_farmer_button_entity) |hire_farmer_button_entity| {
+                    const widget_comp = hire_farmer_button_entity.getComponent(UIWidgetComponent).?;
+                    const sprite_comp = hire_farmer_button_entity.getComponent(SpriteComponent).?;
+                    if (widget_comp.is_hovered) {
+                        const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
+                        if (button.is_pressed) {
+                            sprite_comp.sprite.modulate = .{ .r = 50, .g = 50, .b = 50 };
+                        } else {
+                            sprite_comp.sprite.modulate = Color{ .r = 200, .g = 200, .b = 200 };
+                        }
+
+                        if (button.was_just_pressed) {
+                            var persistent_state = PersistentState.get();
+                            persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
+                            refreshStatBarLabel(context);
                         }
                     } else {
                         sprite_comp.sprite.modulate = .{ .r = 150, .g = 150, .b = 150 };
@@ -214,7 +271,7 @@ pub const TileInterface = struct {
                     }
                 }
             },
-            .owned => {},
+            else => {},
         }
     }
 
