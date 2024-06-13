@@ -34,6 +34,7 @@ const SpriteComponent = comps.SpriteComponent;
 const ColliderComponent = comps.ColliderComponent;
 const TextLabelComponent = comps.TextLabelComponent;
 const UIWidgetComponent = comps.UIWidgetComponent;
+const Button = UIWidgetComponent.Button;
 
 fn refreshStatBarLabel(context: *ECSContext) void {
     if (context.getEntityByTag("stat_bar")) |text_label_entity| {
@@ -57,34 +58,6 @@ pub const StatBarInterface = struct {
     pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
 };
 
-pub const SpriteButtonInterface = struct {
-    pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
-        _ = self;
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        const widget_comp = context.getComponent(entity, UIWidgetComponent).?;
-
-        var sprite = &sprite_comp.sprite;
-        if (widget_comp.is_hovered) {
-            const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
-            if (button.is_pressed) {
-                sprite.modulate = Color.White;
-            } else {
-                sprite.modulate = Color.Red;
-            }
-
-            if (button.was_just_pressed) {
-                var persistent_state = PersistentState.get();
-                persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
-                refreshStatBarLabel(context);
-            }
-        } else {
-            sprite.modulate = Color.Blue;
-        }
-    }
-
-    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
-};
-
 pub const AddTileButtonInterface = struct {
     pub fn tick(_: *@This(), context: *ECSContext, entity: Entity) void {
         const sprite_comp = context.getComponent(entity, SpriteComponent).?;
@@ -92,7 +65,7 @@ pub const AddTileButtonInterface = struct {
 
         var sprite = &sprite_comp.sprite;
         if (widget_comp.is_hovered) {
-            const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
+            const button: *Button = &widget_comp.widget.button;
             if (button.is_pressed) {
                 sprite.modulate = Color{ .r = 100, .g = 100, .b = 100 };
             } else {
@@ -145,88 +118,6 @@ pub const TileInterface = struct {
     build_farm_button_entity: ?WeakEntityRef = null,
     hire_farmer_button_entity: ?WeakEntityRef = null,
 
-    pub fn tick(self: *@This(), context: *ECSContext, entity: Entity) void {
-        switch (self.state) {
-            .owned => {
-                if (self.build_farm_button_entity) |farm_button_entity| {
-                    const widget_comp = farm_button_entity.getComponent(UIWidgetComponent).?;
-                    const sprite_comp = farm_button_entity.getComponent(SpriteComponent).?;
-                    if (widget_comp.is_hovered) {
-                        const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
-                        if (button.is_pressed) {
-                            sprite_comp.sprite.modulate = .{ .r = 50, .g = 50, .b = 50 };
-                        } else {
-                            sprite_comp.sprite.modulate = .{ .r = 200, .g = 200, .b = 200 };
-                        }
-
-                        if (button.was_just_pressed) {
-                            self.state = .farm;
-                            farm_button_entity.deinit();
-                            self.build_farm_button_entity = null;
-
-                            const transform_comp = context.getComponent(entity, TransformComponent).?;
-                            const hire_farmer_button_transform = Transform2D{
-                                .position = .{ .x = transform_comp.transform.position.x + 7.0,  .y = transform_comp.transform.position.y + 16.0 },
-                            };
-                            const hire_farmer_button_entity = context.initEntityAndRef(.{ .tags = &.{ "hire_farmer" } }) catch unreachable;
-                            hire_farmer_button_entity.setComponent(TransformComponent, &.{ .transform = hire_farmer_button_transform }) catch unreachable;
-                            hire_farmer_button_entity.setComponent(UIWidgetComponent, &.{
-                                .widget = .{ .button = .{ .on_just_pressed = onJustPressed_hireFarmerButton, .on_clicked = onClicked_hireFarmerButton } },
-                                .bounds = .{ .x = 0.0, .y = 0.0, .w = 68.0, .h = 20.0 },
-                                .on_hovered = onHovered_hireFarmerButton,
-                                .on_unhovered = onUnhovered_hireFarmerButton,
-                            }) catch unreachable;
-                            hire_farmer_button_entity.setComponent(SpriteComponent, &.{
-                                .sprite = .{
-                                    .texture = AssetDB.get().solid_colored_texture,
-                                    .size = .{ .x = 68.0, .y = 20.0 },
-                                    .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                                    .modulate = .{ .r = 150, .g = 150, .b = 150 },
-                                },
-                            })  catch unreachable;
-                            hire_farmer_button_entity.setComponent(TextLabelComponent, &.{
-                                .text_label = .{
-                                    .font = AssetDB.get().tile_font,
-                                    .text = TextLabel.String.init(context.allocator),
-                                    .color = Color.White,
-                                    .origin = Vec2{ .x = 5.0, .y = 12.0 },
-                                }
-                            }) catch unreachable;
-                            const hire_farmer_text_label_comp = hire_farmer_button_entity.getComponent(TextLabelComponent).?;
-                            hire_farmer_text_label_comp.text_label.setText("Hire Farmer", .{}) catch unreachable;
-                            self.hire_farmer_button_entity = hire_farmer_button_entity;
-                        }
-                    } else {
-                        sprite_comp.sprite.modulate = .{ .r = 150, .g = 150, .b = 150 };
-                    }
-                }
-            },
-            .farm => {
-                // if (self.hire_farmer_button_entity) |hire_farmer_button_entity| {
-                //     const widget_comp = hire_farmer_button_entity.getComponent(UIWidgetComponent).?;
-                //     const sprite_comp = hire_farmer_button_entity.getComponent(SpriteComponent).?;
-                //     if (widget_comp.is_hovered) {
-                //         const button: *UIWidgetComponent.ButtonWidget = &widget_comp.widget.button;
-                //         if (button.is_pressed) {
-                //             sprite_comp.sprite.modulate = .{ .r = 50, .g = 50, .b = 50 };
-                //         } else {
-                //             sprite_comp.sprite.modulate = Color{ .r = 200, .g = 200, .b = 200 };
-                //         }
-                //
-                //         if (button.was_just_pressed) {
-                //             var persistent_state = PersistentState.get();
-                //             persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
-                //             refreshStatBarLabel(context);
-                //         }
-                //     } else {
-                //         sprite_comp.sprite.modulate = .{ .r = 150, .g = 150, .b = 150 };
-                //     }
-                // }
-            },
-            else => {},
-        }
-    }
-
     pub fn idleIncrement(self: *@This(), context: *ECSContext, entity: Entity) void {
         switch (self.state) {
             .initial => {
@@ -248,9 +139,71 @@ pub const TileInterface = struct {
                         const farm_button_entity = context.initEntityAndRef(.{ .tags = &.{ "build_farm" } }) catch unreachable;
                         farm_button_entity.setComponent(TransformComponent, &.{ .transform = build_farm_button_transform }) catch unreachable;
                         farm_button_entity.setComponent(UIWidgetComponent, &.{
-                            .widget = .{ .button = .{} },
+                            .widget = .{
+                                .button = .{
+                                    .on_just_pressed = Button.onJustPressed,
+                                    .on_clicked = struct {
+                                        pub fn onClicked(con: *ECSContext, ent: Entity) void {
+                                            const ui_widget = con.getComponent(ent, UIWidgetComponent).?;
+                                            if (ui_widget.owning_entity) |owning_entity| {
+                                                const local_self = con.getEntityInterfacePtr(TileInterface, owning_entity).?;
+                                                local_self.state = .farm;
+                                                defer con.deinitEntity(ent);
+                                                local_self.build_farm_button_entity = null;
+
+                                                const tm_comp = con.getComponent(owning_entity, TransformComponent).?;
+                                                const hire_farmer_button_transform = Transform2D{
+                                                    .position = .{ .x = tm_comp.transform.position.x + 7.0,  .y = tm_comp.transform.position.y + 16.0 },
+                                                };
+                                                const hire_farmer_button_entity = con.initEntityAndRef(.{ .tags = &.{ "hire_farmer" } }) catch unreachable;
+                                                hire_farmer_button_entity.setComponent(TransformComponent, &.{ .transform = hire_farmer_button_transform }) catch unreachable;
+                                                hire_farmer_button_entity.setComponent(UIWidgetComponent, &.{
+                                                    .widget = .{
+                                                        .button = .{
+                                                            .on_just_pressed = Button.onJustPressed,
+                                                            .on_clicked = struct {
+                                                                pub fn onClicked(c: *ECSContext, e: Entity) void {
+                                                                    var persistent_state = PersistentState.get();
+                                                                    persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
+                                                                    refreshStatBarLabel(c);
+                                                                    Button.onClicked(c, e);
+                                                                }
+                                                            }.onClicked,
+                                                        }
+                                                    },
+                                                    .bounds = .{ .x = 0.0, .y = 0.0, .w = 68.0, .h = 20.0 },
+                                                    .owning_entity = owning_entity,
+                                                    .on_hovered = Button.onHovered,
+                                                    .on_unhovered = Button.onUnhovered,
+                                                }) catch unreachable;
+                                                hire_farmer_button_entity.setComponent(SpriteComponent, &.{
+                                                    .sprite = .{
+                                                        .texture = AssetDB.get().solid_colored_texture,
+                                                        .size = .{ .x = 68.0, .y = 20.0 },
+                                                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                                                        .modulate = .{ .r = 150, .g = 150, .b = 150 },
+                                                    },
+                                                })  catch unreachable;
+                                                hire_farmer_button_entity.setComponent(TextLabelComponent, &.{
+                                                    .text_label = .{
+                                                        .font = AssetDB.get().tile_font,
+                                                        .text = TextLabel.String.init(con.allocator),
+                                                        .color = Color.White,
+                                                        .origin = Vec2{ .x = 5.0, .y = 12.0 },
+                                                    }
+                                                }) catch unreachable;
+                                                const hire_farmer_text_label_comp = hire_farmer_button_entity.getComponent(TextLabelComponent).?;
+                                                hire_farmer_text_label_comp.text_label.setText("Hire Farmer", .{}) catch unreachable;
+                                                local_self.hire_farmer_button_entity = hire_farmer_button_entity;
+                                            }
+                                        }
+                                    }.onClicked,
+                                }
+                            },
                             .bounds = .{ .x = 0.0, .y = 0.0, .w = 68.0, .h = 20.0 },
                             .owning_entity = entity,
+                            .on_hovered = Button.onHovered,
+                            .on_unhovered = Button.onUnhovered,
                         }) catch unreachable;
                         farm_button_entity.setComponent(SpriteComponent, &.{
                             .sprite = .{
@@ -279,35 +232,6 @@ pub const TileInterface = struct {
     }
 
     pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent }; }
-
-    fn onHovered_hireFarmerButton(context: *ECSContext, entity: Entity) void {
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        sprite_comp.sprite.modulate = Color{ .r = 200, .g = 200, .b = 200 };
-    }
-
-    fn onUnhovered_hireFarmerButton(context: *ECSContext, entity: Entity) void {
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        sprite_comp.sprite.modulate = Color{ .r = 150, .g = 150, .b = 150 };
-    }
-
-    fn onJustPressed_hireFarmerButton(context: *ECSContext, entity: Entity) void {
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        sprite_comp.sprite.modulate = Color{ .r = 50, .g = 50, .b = 50 };
-    }
-
-    fn onClicked_hireFarmerButton(context: *ECSContext, entity: Entity) void {
-        // const ui_widget = context.getComponent(entity, UIWidgetComponent).?;
-        // if (ui_widget.owning_entity) |owning_entity| {
-        //     const self = context.getEntityInterfacePtr(@This(), owning_entity);
-        // }
-
-        var persistent_state = PersistentState.get();
-        persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
-        refreshStatBarLabel(context);
-
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        sprite_comp.sprite.modulate = Color{ .r = 200, .g = 200, .b = 200 };
-    }
 
     inline fn updateBattleText(self: *@This(), context: *ECSContext, entity: Entity) void {
         const text_label_comp = context.getComponent(entity, TextLabelComponent).?;

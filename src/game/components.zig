@@ -46,15 +46,45 @@ pub const UIWidgetComponent = struct {
         button,
     };
 
-    pub const ButtonWidget = struct {
+    pub const Button = struct {
         on_just_pressed: ?*const fn(*ECSContext, Entity) void = null,
         on_clicked: ?*const fn(*ECSContext, Entity) void = null,
         is_pressed: bool = false,
         was_just_pressed: bool = false, // If just pressed this frame
+
+        const Colors = struct {
+            const hovered: Color = .{ .r = 200, .g = 200, .b = 200 };
+            const unhovered: Color = .{ .r = 150, .g = 150, .b = 150 };
+            const pressed: Color = .{ .r = 50, .g = 50, .b = 50 };
+        };
+
+        /// Generic on hovered
+        pub fn onHovered(context: *ECSContext, entity: Entity) void {
+            const sprite_comp = context.getComponent(entity, SpriteComponent).?;
+            sprite_comp.sprite.modulate = Button.Colors.hovered;
+        }
+
+        /// Generic on unhovered
+        pub fn onUnhovered(context: *ECSContext, entity: Entity) void {
+            const sprite_comp = context.getComponent(entity, SpriteComponent).?;
+            sprite_comp.sprite.modulate = Button.Colors.unhovered;
+        }
+
+        /// Generic on just pressed
+        pub fn onJustPressed(context: *ECSContext, entity: Entity) void {
+            const sprite_comp = context.getComponent(entity, SpriteComponent).?;
+            sprite_comp.sprite.modulate = Button.Colors.pressed;
+        }
+
+        /// Generic on clicked
+        pub fn onClicked(context: *ECSContext, entity: Entity) void {
+            const sprite_comp = context.getComponent(entity, SpriteComponent).?;
+            sprite_comp.sprite.modulate = Button.Colors.hovered;
+        }
     };
 
     pub const Widget = union(Type) {
-        button: ButtonWidget,
+        button: Button,
     };
 
     widget: Widget = undefined,

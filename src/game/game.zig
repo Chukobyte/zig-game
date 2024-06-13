@@ -35,7 +35,6 @@ const UISystem = ec_systems.UISystem;
 
 const PersistentState = state.PersistentState;
 
-const SpriteButtonInterface = entity_interfaces.SpriteButtonInterface;
 const AddTileButtonInterface = entity_interfaces.AddTileButtonInterface;
 const StatBarInterface = entity_interfaces.StatBarInterface;
 const TileInterface = entity_interfaces.TileInterface;
@@ -59,10 +58,11 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ SpriteButtonInterface, AddTileButtonInterface, StatBarInterface, TileInterface },
+    .entity_interfaces = &.{ AddTileButtonInterface, StatBarInterface, TileInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
+pub const Entity = ECSContext.Entity;
 pub const WeakEntityRef = ECSContext.WeakEntityRef;
 
 var is_game_running = false;
@@ -134,7 +134,7 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
 
     // Temp test sprite button widget
     {
-        const sprite_button_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = SpriteButtonInterface, .tags = &.{ "sprite" } });
+        const sprite_button_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "sprite" } });
         try sprite_button_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
         try sprite_button_entity.setComponent(SpriteComponent, &.{
             .sprite = .{
@@ -145,8 +145,32 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
             },
         });
         try sprite_button_entity.setComponent(UIWidgetComponent, &.{
-            .widget = .{ .button = .{} },
+            .widget = .{
+                .button = .{
+                    .on_just_pressed = struct {
+                        pub fn onJustPressed(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.White; }
+                    }.onJustPressed,
+                    .on_clicked = struct {
+                        pub fn onClicked(context: *ECSContext, entity: Entity) void {
+                            var persistent_state = PersistentState.get();
+                            persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
+                            if (context.getEntityByTag("stat_bar")) |text_label_entity| {
+                                if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
+                                    persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
+                                }
+                            }
+                            context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Red;
+                        }
+                    }.onClicked,
+                }
+            },
             .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
+            .on_hovered = struct {
+                pub fn onHovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Red; }
+            }.onHovered,
+            .on_unhovered = struct {
+                pub fn onUnhovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Blue; }
+            }.onUnhovered,
         });
     }
 }
