@@ -156,7 +156,7 @@ pub const TileInterface = struct {
                         if (button.is_pressed) {
                             sprite_comp.sprite.modulate = .{ .r = 50, .g = 50, .b = 50 };
                         } else {
-                            sprite_comp.sprite.modulate = Color{ .r = 200, .g = 200, .b = 200 };
+                            sprite_comp.sprite.modulate = .{ .r = 200, .g = 200, .b = 200 };
                         }
 
                         if (button.was_just_pressed) {
