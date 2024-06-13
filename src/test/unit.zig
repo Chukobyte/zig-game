@@ -29,6 +29,8 @@ const TestEntityInterface = struct {
     var has_called_tick = false;
     var has_called_idle_increment = false;
 
+    default_num: i32 = 10,
+
     pub fn init(_: *TestEntityInterface, _: *ECSContext, _: ECSContext.Entity) void {
         has_called_init = true;
     }
@@ -215,6 +217,10 @@ test "ecs test" {
 
 
     // Test entity interface
+    const test_entity_interface_ptr: ?*TestEntityInterface = ecs_context.getEntityInterfacePtr(TestEntityInterface, new_entity);
+    try std.testing.expectEqual(true, test_entity_interface_ptr != null);
+    try std.testing.expectEqual(10, test_entity_interface_ptr.?.default_num);
+
     try std.testing.expectEqual(0, new_entity);
     try std.testing.expectEqual(true, TestEntityInterface.has_called_init);
     try std.testing.expectEqual(false, TestEntityInterface.has_called_tick);

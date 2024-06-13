@@ -71,18 +71,30 @@ pub const UISystem = struct {
                 const is_mouse_hovering = full_bounds.doesOverlap(&mouse_collider);
                 if (!widget_comp.is_hovered and is_mouse_hovering) {
                     widget_comp.is_hovered = true;
+                    if (widget_comp.on_hovered) |on_hovered| {
+                        on_hovered(context, iter.getEntity());
+                    }
                 } else if (widget_comp.is_hovered and !is_mouse_hovering) {
                     widget_comp.is_hovered = false;
+                    if (widget_comp.on_unhovered) |on_unhovered| {
+                        on_unhovered(context, iter.getEntity());
+                    }
                 }
 
                 switch (widget_comp.widget) {
                     .button => |*button| {
                         if (is_mouse_hovering) {
-                            button.is_pressed = zeika.isKeyPressed(.mouse_button_left, 0);
                             if (zeika.isKeyJustPressed(.mouse_button_left, 0)) {
+                                button.is_pressed = true;
                                 button.was_just_pressed = true;
+                                if (button.on_just_pressed) |on_just_pressed| {
+                                    on_just_pressed(context, iter.getEntity());
+                                }
+                            } else if (zeika.isKeyJustReleased(.mouse_button_left, 0)) {
+                                button.is_pressed = false;
+                                button.was_just_pressed = false;
                                 if (button.on_clicked) |on_clicked| {
-                                    on_clicked(iter.getEntity());
+                                    on_clicked(context, iter.getEntity());
                                 }
                             } else {
                                 button.was_just_pressed = false;

@@ -47,7 +47,8 @@ pub const UIWidgetComponent = struct {
     };
 
     pub const ButtonWidget = struct {
-        on_clicked: ?*const fn(Entity) void = null,
+        on_just_pressed: ?*const fn(*ECSContext, Entity) void = null,
+        on_clicked: ?*const fn(*ECSContext, Entity) void = null,
         is_pressed: bool = false,
         was_just_pressed: bool = false, // If just pressed this frame
     };
@@ -59,4 +60,7 @@ pub const UIWidgetComponent = struct {
     widget: Widget = undefined,
     bounds: ?Rect2 = null,
     is_hovered: bool = false,
+    owning_entity: ?Entity = null,
+    on_hovered: ?*const fn(*ECSContext, Entity) void = null,
+    on_unhovered: ?*const fn(*ECSContext, Entity) void = null,
 };

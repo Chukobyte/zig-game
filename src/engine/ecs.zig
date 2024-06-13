@@ -612,6 +612,18 @@ pub fn ECSContext(context_params: ECSContextParams) type {
             return entity < self.entity_data_list.items.len and self.entity_data_list.items[entity].is_valid;
         }
 
+        pub fn getEntityInterfacePtr(self: *@This(), comptime T: type, entity: Entity) ?*T {
+            if (self.isEntityValid(entity)) {
+                if (self.entity_data_list.items[entity].interface) |interface| {
+                    const type_index = entity_interface_type_list.getIndex(T);
+                    if (type_index == interface.interface_id) {
+                        return @alignCast(@ptrCast(interface.instance));
+                    }
+                }
+            }
+            return null;
+        }
+
         pub fn setComponent(self: *@This(), entity: Entity, comptime T: type, component: *const T) !void {
             const entity_data: *EntityData = &self.entity_data_list.items[entity];
             const comp_index = component_type_list.getIndex(T);
