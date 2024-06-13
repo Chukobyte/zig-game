@@ -35,7 +35,6 @@ const UISystem = ec_systems.UISystem;
 
 const PersistentState = state.PersistentState;
 
-const AddTileButtonInterface = entity_interfaces.AddTileButtonInterface;
 const StatBarInterface = entity_interfaces.StatBarInterface;
 const TileInterface = entity_interfaces.TileInterface;
 
@@ -58,7 +57,7 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ AddTileButtonInterface, StatBarInterface, TileInterface },
+    .entity_interfaces = &.{ StatBarInterface, TileInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
@@ -117,7 +116,7 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
 
     // Temp button for searching tile
     {
-        const search_tile_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = AddTileButtonInterface, .tags = &.{ "search_tile" } });
+        const search_tile_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "search_tile" } });
         try search_tile_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 350.0, .y = 200.0 } } });
         try search_tile_entity.setComponent(SpriteComponent, &.{
             .sprite = .{
@@ -127,8 +126,46 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
             },
         });
         try search_tile_entity.setComponent(UIWidgetComponent, &.{
-            .widget = .{ .button = .{} },
+            .widget = .{
+                .button = .{
+                    .on_just_pressed = struct {
+                        pub fn onJustPressed(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = .{ .r = 100, .g = 100, .b = 100 }; }
+                    }.onJustPressed,
+                    .on_clicked = struct {
+                        pub fn onClicked(context: *ECSContext, entity: Entity) void {
+                            defer context.deinitEntity(entity);
+                            const transform_comp = context.getComponent(entity, TransformComponent).?;
+                            const new_tile_entity: WeakEntityRef = context.initEntityAndRef(.{ .interface = TileInterface, .tags = &.{ "tile" } }) catch unreachable;
+                            const new_tile_transform = transform_comp.transform;
+                            new_tile_entity.setComponent(TransformComponent, &.{ .transform = new_tile_transform }) catch unreachable;
+                            new_tile_entity.setComponent(SpriteComponent, &.{
+                                .sprite = .{
+                                    .texture = AssetDB.get().solid_colored_texture,
+                                    .size = .{ .x = 80.0, .y = 80.0 },
+                                    .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
+                                    .modulate = .{ .r = 32, .g = 0, .b = 178 },
+                                },
+                            })  catch unreachable;
+                            new_tile_entity.setComponent(TextLabelComponent, &.{
+                                .text_label = .{
+                                    .font = AssetDB.get().tile_font,
+                                    .text = TextLabel.String.init(context.allocator),
+                                    .color = Color.White,
+                                    .origin = Vec2{ .x = 5.0, .y = 75.0 },
+                                }
+                            }) catch unreachable;
+                            context.getComponent(entity, SpriteComponent).?.sprite.modulate = .{ .r = 366, .g = 366, .b = 366 };
+                        }
+                    }.onClicked,
+                }
+            },
             .bounds = .{ .x = 0.0, .y = 0.0, .w = 32.0, .h = 32.0 },
+            .on_hovered = struct {
+                pub fn onHovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = .{ .r = 366, .g = 366, .b = 366 }; }
+            }.onHovered,
+            .on_unhovered = struct {
+                pub fn onUnhovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.White; }
+            }.onUnhovered,
         });
     }
 

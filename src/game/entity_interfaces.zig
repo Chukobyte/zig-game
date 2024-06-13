@@ -58,51 +58,6 @@ pub const StatBarInterface = struct {
     pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
 };
 
-pub const AddTileButtonInterface = struct {
-    pub fn tick(_: *@This(), context: *ECSContext, entity: Entity) void {
-        const sprite_comp = context.getComponent(entity, SpriteComponent).?;
-        const widget_comp = context.getComponent(entity, UIWidgetComponent).?;
-
-        var sprite = &sprite_comp.sprite;
-        if (widget_comp.is_hovered) {
-            const button: *Button = &widget_comp.widget.button;
-            if (button.is_pressed) {
-                sprite.modulate = Color{ .r = 100, .g = 100, .b = 100 };
-            } else {
-                sprite.modulate = Color{ .r = 366, .g = 366, .b = 366 };
-            }
-
-            if (button.was_just_pressed) {
-                defer context.deinitEntity(entity);
-                const transform_comp = context.getComponent(entity, TransformComponent).?;
-                const new_tile_entity: WeakEntityRef = context.initEntityAndRef(.{ .interface = TileInterface, .tags = &.{ "tile" } }) catch unreachable;
-                const new_tile_transform = transform_comp.transform;
-                new_tile_entity.setComponent(TransformComponent, &.{ .transform = new_tile_transform }) catch unreachable;
-                new_tile_entity.setComponent(SpriteComponent, &.{
-                    .sprite = .{
-                        .texture = AssetDB.get().solid_colored_texture,
-                        .size = .{ .x = 80.0, .y = 80.0 },
-                        .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-                        .modulate = .{ .r = 32, .g = 0, .b = 178 },
-                    },
-                })  catch unreachable;
-                new_tile_entity.setComponent(TextLabelComponent, &.{
-                    .text_label = .{
-                        .font = AssetDB.get().tile_font,
-                        .text = TextLabel.String.init(context.allocator),
-                        .color = Color.White,
-                        .origin = Vec2{ .x = 5.0, .y = 75.0 },
-                    }
-                }) catch unreachable;
-            }
-        } else {
-            sprite.modulate = Color.White;
-        }
-    }
-
-    pub fn getArchetype() []const type { return &.{ TransformComponent, SpriteComponent, UIWidgetComponent }; }
-};
-
 // TODO: Move this into a component and ec system
 pub const TileInterface = struct {
     const State = enum {
