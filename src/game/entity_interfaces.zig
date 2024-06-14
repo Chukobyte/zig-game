@@ -56,6 +56,7 @@ pub const TileInterface = struct {
     battles_to_fight: usize = 10,
     state: State = .initial,
 
+    tile_text_label_entity: ?WeakEntityRef = null,
     build_farm_button_entity: ?WeakEntityRef = null,
     build_logger_button_entity: ?WeakEntityRef = null,
 
@@ -73,6 +74,7 @@ pub const TileInterface = struct {
                         self.state = .owned;
                         var text_label_comp = context.getComponent(entity, TextLabelComponent).?;
                         text_label_comp.text_label.setText("", .{}) catch unreachable;
+                        self.tile_text_label_entity = WeakEntityRef{ .id = entity, .context = context }; // TODO: Temp, put this somewhere else/do something different...
                         self.createTileBuildButtons(context, entity) catch unreachable;
                     }
                 }
@@ -220,6 +222,9 @@ pub const TileInterface = struct {
             }) catch unreachable;
             const hire_farmer_text_label_comp = hire_farmer_button_entity.getComponent(TextLabelComponent).?;
             hire_farmer_text_label_comp.text_label.setText("Hire Farmer", .{}) catch unreachable;
+            if (self.tile_text_label_entity.?.getComponent(TextLabelComponent)) |text_label_comp| {
+                text_label_comp.text_label.setText("Farmers: {d}", .{ 0 }) catch unreachable;
+            }
         }
     }
 
@@ -273,6 +278,9 @@ pub const TileInterface = struct {
             }) catch unreachable;
             const hire_logger_text_label_comp = hire_logger_button_entity.getComponent(TextLabelComponent).?;
             hire_logger_text_label_comp.text_label.setText("Hire Logger", .{}) catch unreachable;
+            if (self.tile_text_label_entity.?.getComponent(TextLabelComponent)) |text_label_comp| {
+                text_label_comp.text_label.setText("Loggers: {d}", .{ 0 }) catch unreachable;
+            }
         }
     }
 };

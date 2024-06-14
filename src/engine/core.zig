@@ -57,10 +57,10 @@ pub const TextLabel = struct {
         try self.text.set(fmt, args);
     }
 
-    pub inline fn getDrawConfig(self: *const @This(), position: Vec2, z_index: i32) Renderer.TextDrawQueueConfig {
+    pub inline fn getDrawConfig(self: *@This(), position: Vec2, z_index: i32) Renderer.TextDrawQueueConfig {
         return .{
             .font = self.font,
-            .text = self.text.get(),
+            .text = self.text.getCString(),
             .position = Vec2{ .x = position.x + self.origin.x, .y = position.y + self.origin.y },
             .color = self.color,
             .z_index = z_index,

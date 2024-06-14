@@ -167,48 +167,6 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
             }.onUnhovered,
         });
     }
-
-    // Temp test sprite button widget
-    // {
-    //     const sprite_button_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "sprite" } });
-    //     try sprite_button_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 100.0, .y = 100.0 } } });
-    //     try sprite_button_entity.setComponent(SpriteComponent, &.{
-    //         .sprite = .{
-    //             .texture = game_asset_db.solid_colored_texture,
-    //             .size = .{ .x = 64.0, .y = 64.0 },
-    //             .draw_source = .{ .x = 0.0, .y = 0.0, .w = 1.0, .h = 1.0 },
-    //             .modulate = .{ .r = 32, .g = 0, .b = 178 },
-    //         },
-    //     });
-    //     try sprite_button_entity.setComponent(UIWidgetComponent, &.{
-    //         .widget = .{
-    //             .button = .{
-    //                 .on_just_pressed = struct {
-    //                     pub fn onJustPressed(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.White; }
-    //                 }.onJustPressed,
-    //                 .on_clicked = struct {
-    //                     pub fn onClicked(context: *ECSContext, entity: Entity) void {
-    //                         var persistent_state = PersistentState.get();
-    //                         persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
-    //                         if (context.getEntityByTag("stat_bar")) |text_label_entity| {
-    //                             if (context.getComponent(text_label_entity, TextLabelComponent)) |text_label_comp| {
-    //                                 persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-    //                             }
-    //                         }
-    //                         context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Red;
-    //                     }
-    //                 }.onClicked,
-    //             }
-    //         },
-    //         .bounds = .{ .x = 0.0, .y = 0.0, .w = 64.0, .h = 64.0 },
-    //         .on_hovered = struct {
-    //             pub fn onHovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Red; }
-    //         }.onHovered,
-    //         .on_unhovered = struct {
-    //             pub fn onUnhovered(context: *ECSContext, entity: Entity) void { context.getComponent(entity, SpriteComponent).?.sprite.modulate = Color.Blue; }
-    //         }.onUnhovered,
-    //     });
-    // }
 }
 
 pub fn run() !void {

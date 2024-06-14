@@ -4,25 +4,25 @@ pub fn DynamicString(stack_buffer_size: comptime_int, comptime auto_free_heap: b
     return struct {
 
         const Mode = enum {
-            initial,
             stack,
             heap,
         };
 
         allocator: std.mem.Allocator,
-        mode: Mode = .initial,
-        stack_buffer: [stack_buffer_size]u8,
+        mode: Mode = .stack,
+        stack_buffer: [stack_buffer_size]u8 = undefined,
         heap_buffer: ?[]u8 = null,
-        buffer: []u8,
+        buffer: [:0]u8 = undefined,
+        len: usize = 0,
 
         pub fn init(allocator: std.mem.Allocator) @This() {
-            var new_string = @This(){ .allocator = allocator, .mode = undefined, .stack_buffer = undefined, .buffer = undefined, };
+            var new_string = @This(){ .allocator = allocator };
             new_string.set("", .{}) catch { unreachable; };
             return new_string;
         }
 
         pub inline fn initAndSet(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !@This() {
-            var new_string = @This(){ .allocator = allocator, .mode = undefined, .stack_buffer = undefined, .buffer = undefined, };
+            var new_string = @This(){ .allocator = allocator };
             try new_string.set(fmt, args);
             return new_string;
         }
@@ -45,14 +45,15 @@ pub fn DynamicString(stack_buffer_size: comptime_int, comptime auto_free_heap: b
                         self.heap_buffer = try self.allocator.alloc(u8, string_length);
                     }
                 }
-                self.buffer = try std.fmt.bufPrint(self.heap_buffer.?, fmt, args);
+                self.buffer = try std.fmt.bufPrintZ(self.heap_buffer.?, fmt, args);
             } else {
                 self.mode = .stack;
-                self.buffer = try std.fmt.bufPrint(&self.stack_buffer, fmt, args);
+                self.buffer = try std.fmt.bufPrintZ(&self.stack_buffer, fmt, args);
                 if (auto_free_heap) {
                     self.freeHeap();
                 }
             }
+            self.len = string_length - 1;
         }
 
         /// Will free heap if no longer being used
@@ -67,15 +68,15 @@ pub fn DynamicString(stack_buffer_size: comptime_int, comptime auto_free_heap: b
         }
 
         pub inline fn get(self: *const @This()) []const u8 {
+            return self.buffer[0..self.len];
+        }
+
+        pub inline fn getCString(self: *@This()) [:0]const u8 {
             return self.buffer;
         }
 
-        pub inline fn getLen(self: *const @This()) usize {
-            return self.buffer.len;
-        }
-
         pub inline fn isEmpty(self: *const @This()) bool {
-            return self.getLen() == 0;
+            return self.len == 0;
         }
     };
 }

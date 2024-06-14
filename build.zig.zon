@@ -9,8 +9,8 @@
     },
     .dependencies = .{
         .zeika = .{
-            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.17.tar.gz",
-            .hash = "1220f2559850dffc6d64d1d1331e50dc680cb8396dd3ad7b837959a6c615b7133362",
+            .url = "https://github.com/Chukobyte/zeika/archive/refs/tags/v0.0.18.tar.gz",
+            .hash = "12200519f7879f9f5ada979bef739f0d88cfdd45b26ae2bd155e089514345d934e73",
         },
     },
 }

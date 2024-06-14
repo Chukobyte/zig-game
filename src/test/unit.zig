@@ -402,9 +402,17 @@ test "string test" {
     try std.testing.expectEqualStrings("String on heap!", test_string.buffer);
 
     const test_string2 = try string.String16.initAndSet(allocator, "Some nice text", .{});
+    defer test_string2.deinit();
     try std.testing.expectEqual(.stack, test_string2.mode);
     try std.testing.expectEqualStrings("Some nice text", test_string2.get());
-    defer test_string2.deinit();
+
+    var test_string3 = string.String16.init(allocator);
+    defer test_string3.deinit();
+    try std.testing.expectEqualStrings("", test_string3.buffer);
+    try test_string3.set("More text yay!", .{});
+    try std.testing.expectEqualStrings("More text yay!", test_string3.buffer);
+    try test_string3.set("One more", .{});
+    try std.testing.expectEqualStrings("One more", test_string3.buffer);
 }
 
 test "persistent state test" {
