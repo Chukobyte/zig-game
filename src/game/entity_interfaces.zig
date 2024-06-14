@@ -99,7 +99,7 @@ pub const TileInterface = struct {
             self.build_farm_button_entity = farm_button_entity;
             try farm_button_entity.setComponent(TransformComponent, &.{ .transform = build_farm_button_transform });
             try farm_button_entity.setComponent(UIWidgetComponent, &.{
-                .widget = .{ .button = .{ .on_just_pressed = Button.onJustPressed, .on_clicked = BuildFarmButton_onClicked } },
+                .widget = .{ .button = .{ .on_just_pressed = Button.onJustPressed, .on_clicked = buildFarmButton_onClicked } },
                 .bounds = .{ .x = 0.0, .y = 0.0, .w = 68.0, .h = 20.0 },
                 .owning_entity = entity,
                 .on_hovered = Button.onHovered,
@@ -170,7 +170,7 @@ pub const TileInterface = struct {
         }
     }
 
-    fn BuildFarmButton_onClicked(context: *ECSContext, entity: Entity) void {
+    fn buildFarmButton_onClicked(context: *ECSContext, entity: Entity) void {
         const ui_widget = context.getComponent(entity, UIWidgetComponent).?;
         if (ui_widget.owning_entity) |owning_entity| {
             const self = context.getEntityInterfacePtr(@This(), owning_entity).?;
