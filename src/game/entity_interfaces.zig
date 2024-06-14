@@ -44,21 +44,6 @@ fn refreshStatBarLabel(context: *ECSContext) void {
     }
 }
 
-pub const StatBarInterface = struct {
-    // const energy_per_increment = 1;
-
-    // pub fn idleIncrement(_: *@This(), context: *ECSContext, entity: Entity) void {
-    //     if (context.getComponent(entity, TextLabelComponent)) |text_label_comp| {
-    //         var persistent_state = PersistentState.get();
-    //         persistent_state.energy.addScalar(&persistent_state.energy, energy_per_increment) catch unreachable;
-    //         persistent_state.refreshTextLabel(text_label_comp) catch unreachable;
-    //     }
-    // }
-
-    pub fn getArchetype() []const type { return &.{ TransformComponent, TextLabelComponent }; }
-};
-
-// TODO: Move this into a component and ec system
 pub const TileInterface = struct {
     const State = enum {
         initial,

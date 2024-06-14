@@ -35,7 +35,6 @@ const UISystem = ec_systems.UISystem;
 
 const PersistentState = state.PersistentState;
 
-const StatBarInterface = entity_interfaces.StatBarInterface;
 const TileInterface = entity_interfaces.TileInterface;
 
 const AssetDB = asset_db.AssetDB;
@@ -57,7 +56,7 @@ pub const GameProperties = struct {
 var game_properties = GameProperties{};
 
 pub const ECSContext = ecs.ECSContext(.{
-    .entity_interfaces = &.{ StatBarInterface, TileInterface },
+    .entity_interfaces = &.{ TileInterface },
     .components = &.{ TransformComponent, SpriteComponent, TextLabelComponent, ColliderComponent, UIWidgetComponent },
     .systems = &.{ MainSystem, SpriteRenderingSystem, TextRenderingSystem, UISystem },
 });
@@ -95,7 +94,7 @@ fn setupInitialScene(ecs_context: *ECSContext, game_asset_db: *AssetDB) !void {
     // TODO: Start using ui components for positioning
     // Stat bar
     {
-        const stat_bar_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .interface = StatBarInterface, .tags = &.{ "stat_bar" } });
+        const stat_bar_entity: WeakEntityRef = try ecs_context.initEntityAndRef(.{ .tags = &.{ "stat_bar" } });
         try stat_bar_entity.setComponent(TransformComponent, &.{ .transform = .{ .position = .{ .x = 0.0, .y = 0.0 } } });
         try stat_bar_entity.setComponent(SpriteComponent, &.{
             .sprite = .{
