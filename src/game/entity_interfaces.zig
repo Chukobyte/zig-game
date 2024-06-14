@@ -55,6 +55,8 @@ pub const TileInterface = struct {
     battles_won: usize = 0,
     battles_to_fight: usize = 10,
     state: State = .initial,
+    farmers: usize = 0,
+    loggers: usize = 0,
 
     tile_text_label_entity: ?WeakEntityRef = null,
     build_farm_button_entity: ?WeakEntityRef = null,
@@ -191,9 +193,17 @@ pub const TileInterface = struct {
                         .on_just_pressed = Button.onJustPressed,
                         .on_clicked = struct {
                             pub fn onClicked(con: *ECSContext, ent: Entity) void {
-                                var persistent_state = PersistentState.get();
-                                persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
-                                refreshStatBarLabel(con);
+                                const widget = con.getComponent(ent, UIWidgetComponent).?;
+                                if (widget.owning_entity) |owning_ent| {
+                                    const local_self = con.getEntityInterfacePtr(TileInterface, owning_ent).?;
+                                    var tile_text_label_comp = local_self.tile_text_label_entity.?.getComponent(TextLabelComponent).?;
+                                    local_self.farmers += 1;
+                                    tile_text_label_comp.text_label.setText("Farmers: {d}", .{ local_self.farmers }) catch unreachable;
+
+                                    var persistent_state = PersistentState.get();
+                                    persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
+                                    refreshStatBarLabel(con);
+                                }
                                 Button.onClicked(con, ent);
                             }
                         }.onClicked,
@@ -247,9 +257,17 @@ pub const TileInterface = struct {
                         .on_just_pressed = Button.onJustPressed,
                         .on_clicked = struct {
                             pub fn onClicked(con: *ECSContext, ent: Entity) void {
-                                var persistent_state = PersistentState.get();
-                                persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
-                                refreshStatBarLabel(con);
+                                const widget = con.getComponent(ent, UIWidgetComponent).?;
+                                if (widget.owning_entity) |owning_ent| {
+                                    const local_self = con.getEntityInterfacePtr(TileInterface, owning_ent).?;
+                                    var tile_text_label_comp = local_self.tile_text_label_entity.?.getComponent(TextLabelComponent).?;
+                                    local_self.loggers += 1;
+                                    tile_text_label_comp.text_label.setText("Loggers: {d}", .{ local_self.loggers }) catch unreachable;
+
+                                    var persistent_state = PersistentState.get();
+                                    persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
+                                    refreshStatBarLabel(con);
+                                }
                                 Button.onClicked(con, ent);
                             }
                         }.onClicked,
