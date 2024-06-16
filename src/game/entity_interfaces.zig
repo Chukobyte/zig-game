@@ -49,14 +49,11 @@ pub const TileInterface = struct {
         initial,
         in_battle,
         owned,
-        farm,
     };
 
     battles_won: usize = 0,
     battles_to_fight: usize = 10,
     state: State = .initial,
-    farmers: usize = 0,
-    loggers: usize = 0,
 
     tile_text_label_entity: ?WeakEntityRef = null,
     build_farm_button_entity: ?WeakEntityRef = null,
@@ -81,7 +78,13 @@ pub const TileInterface = struct {
                     }
                 }
             },
-            else => {},
+            else => {
+                // TODO: Temp incrementing resources and refreshing stat bar
+                var persistent_state = PersistentState.get();
+                persistent_state.food.add(&persistent_state.food, &persistent_state.farmers) catch unreachable;
+                persistent_state.wood.add(&persistent_state.wood, &persistent_state.loggers) catch unreachable;
+                refreshStatBarLabel(context);
+            },
         }
     }
 
@@ -178,7 +181,6 @@ pub const TileInterface = struct {
         const ui_widget = context.getComponent(entity, UIWidgetComponent).?;
         if (ui_widget.owning_entity) |owning_entity| {
             const self = context.getEntityInterfacePtr(@This(), owning_entity).?;
-            self.state = .farm;
             defer self.deleteTileBuildButtons();
 
             const tm_comp = context.getComponent(owning_entity, TransformComponent).?;
@@ -197,12 +199,9 @@ pub const TileInterface = struct {
                                 if (widget.owning_entity) |owning_ent| {
                                     const local_self = con.getEntityInterfacePtr(TileInterface, owning_ent).?;
                                     var tile_text_label_comp = local_self.tile_text_label_entity.?.getComponent(TextLabelComponent).?;
-                                    local_self.farmers += 1;
-                                    tile_text_label_comp.text_label.setText("Farmers: {d}", .{ local_self.farmers }) catch unreachable;
-
                                     var persistent_state = PersistentState.get();
-                                    persistent_state.food.value.addScalar(&persistent_state.food.value, 1) catch unreachable;
-                                    refreshStatBarLabel(con);
+                                    persistent_state.farmers.addScalar(&persistent_state.farmers, 1) catch unreachable;
+                                    tile_text_label_comp.text_label.setText("Farmers: {d}", .{ persistent_state.farmers.value }) catch unreachable;
                                 }
                                 Button.onClicked(con, ent);
                             }
@@ -242,7 +241,6 @@ pub const TileInterface = struct {
         const ui_widget = context.getComponent(entity, UIWidgetComponent).?;
         if (ui_widget.owning_entity) |owning_entity| {
             const self = context.getEntityInterfacePtr(@This(), owning_entity).?;
-            self.state = .farm;
             defer self.deleteTileBuildButtons();
 
             const tm_comp = context.getComponent(owning_entity, TransformComponent).?;
@@ -261,12 +259,9 @@ pub const TileInterface = struct {
                                 if (widget.owning_entity) |owning_ent| {
                                     const local_self = con.getEntityInterfacePtr(TileInterface, owning_ent).?;
                                     var tile_text_label_comp = local_self.tile_text_label_entity.?.getComponent(TextLabelComponent).?;
-                                    local_self.loggers += 1;
-                                    tile_text_label_comp.text_label.setText("Loggers: {d}", .{ local_self.loggers }) catch unreachable;
-
                                     var persistent_state = PersistentState.get();
-                                    persistent_state.materials.value.addScalar(&persistent_state.materials.value, 1) catch unreachable;
-                                    refreshStatBarLabel(con);
+                                    persistent_state.loggers.addScalar(&persistent_state.loggers, 1) catch unreachable;
+                                    tile_text_label_comp.text_label.setText("Loggers: {d}", .{ persistent_state.loggers.value }) catch unreachable;
                                 }
                                 Button.onClicked(con, ent);
                             }

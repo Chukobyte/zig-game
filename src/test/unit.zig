@@ -422,23 +422,23 @@ test "persistent state test" {
     const state = PersistentState.init(allocator);
     defer state.deinit();
 
-    const BigInt = std.math.big.int.Managed;
+    const BigInt = PersistentState.BigInt;
 
-    var other = try BigInt.init(allocator);
-    var result = try BigInt.init(allocator);
+    var other = BigInt.init(allocator);
+    var result = BigInt.init(allocator);
     defer other.deinit();
     defer result.deinit();
 
-    try state.energy.setString(10, "3000");
-    try other.setString(10, "1000");
-    try result.add(&state.energy, &other);
-    var result_string = try result.toString(allocator, 10, .upper);
-    try state.energy.setString(10, result_string);
+    try state.food.setString("3000");
+    try other.setString("1000");
+    try result.add(&state.food, &other);
+    var result_string = try result.toString(allocator);
+    try state.food.setString(result_string);
     try std.testing.expectEqualStrings("4000", result_string);
     allocator.free(result_string);
 
-    try result.addScalar(&state.energy, 8000);
-    result_string = try result.toString(allocator, 10, .upper);
+    try result.addScalar(&state.food, 8000);
+    result_string = try result.toString(allocator);
     try std.testing.expectEqualStrings("12000", result_string);
     allocator.free(result_string);
 }
